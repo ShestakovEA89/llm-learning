@@ -1,0 +1,8 @@
+streamlit
+anthropic
+python-dotenv
+llama-index
+llama-index-llms-anthropic
+llama-index-embeddings-huggingface
+llama-index-readers-file
+pypdf
