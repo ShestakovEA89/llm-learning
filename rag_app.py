@@ -12,7 +12,7 @@ load_dotenv()
 Settings.llm = Anthropic(model="claude-sonnet-4-6")
 Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
 
-st.title("Помощник ПТО-инженера")
+st.title("Помощник инженера ПТО")
 st.write("Документы сохраняются в облаке — не нужно загружать их заново каждый раз")
 
 UPLOAD_DIR = "uploaded_docs"
