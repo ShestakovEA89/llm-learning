@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+import psycopg2
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings, StorageContext
 from llama_index.llms.anthropic import Anthropic
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
@@ -28,6 +29,24 @@ def get_vector_store():
         dimension=384,
     )
 
+
+def get_document_list():
+    try:
+        conn = psycopg2.connect(SUPABASE_CONNECTION)
+        cur = conn.cursor()
+        cur.execute("SELECT DISTINCT metadata->>'file_name' FROM vecs.pto_documents;")
+        docs = [row[0] for row in cur.fetchall() if row[0]]
+        cur.close()
+        conn.close()
+        return docs
+    except Exception:
+        return []
+
+
+# Показываем список документов прямо в интерфейсе
+doc_list = get_document_list()
+if doc_list:
+    st.caption(f"📚 Документы в базе: {', '.join(doc_list)}")
 
 # Подключаемся к существующему индексу в Supabase при старте приложения
 if "index" not in st.session_state:
@@ -63,16 +82,19 @@ with st.expander("➕ Загрузить новые документы"):
             )
             documents = reader.load_data()
 
-            # Добавляем новые документы к существующему индексу
             for doc in documents:
                 st.session_state.index.insert(doc)
 
         st.success(f"Добавлено документов: {len(uploaded_files)}")
+        st.rerun()
 
-# Основной чат — работает всегда, если в базе есть хоть какие-то данные
+# Основной чат
 st.divider()
 
 query_engine = st.session_state.index.as_query_engine(similarity_top_k=8)
+
+if "history" not in st.session_state:
+    st.session_state.history = []
 
 for msg in st.session_state.history:
     with st.chat_message(msg["role"]):
@@ -94,11 +116,11 @@ if user_input:
     for i, node in enumerate(response.source_nodes, 1):
         file_name = node.node.metadata.get("file_name") or node.node.metadata.get("file_path") or "источник"
         score = getattr(node, "score", None)
-        raw_text = node.node.text or getattr(node.node, "get_content", lambda: "")()
+        raw_text = node.node.text or ""
         preview = raw_text[:150].replace("\n", " ").strip() if raw_text else "(текст недоступен)"
         score_str = f" (релевантность: {score:.2f})" if score is not None else ""
         sources_text += f"\n{i}. **{file_name}**{score_str}\n> {preview}...\n"
- 
+
     full_answer = answer + sources_text
 
     st.session_state.history.append({"role": "assistant", "content": full_answer})
