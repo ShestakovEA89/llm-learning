@@ -5,4 +5,5 @@ llama-index
 llama-index-llms-anthropic
 llama-index-embeddings-huggingface
 llama-index-readers-file
+llama-index-vector-stores-supabase
 pypdf
