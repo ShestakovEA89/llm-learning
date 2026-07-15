@@ -11,6 +11,68 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+st.markdown(
+    """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    body,
+    p:not([data-testid*="Icon" i]),
+    span:not([data-testid*="Icon" i]),
+    label:not([data-testid*="Icon" i]),
+    button:not([data-testid*="Icon" i]),
+    input:not([data-testid*="Icon" i]),
+    textarea:not([data-testid*="Icon" i]) {
+        font-family: 'Inter', sans-serif !important;
+    }
+
+    .stButton > button,
+    .stTextInput > div > div > input,
+    .stTextArea > div > div > textarea,
+    .stSelectbox > div > div {
+        border-radius: 12px !important;
+    }
+
+    .stButton > button {
+        background-color: #0F9D6E !important;
+        border-color: #0F9D6E !important;
+    }
+
+    .stTextInput *, .stTextArea * {
+        border: none !important;
+        outline: none !important;
+        box-shadow: none !important;
+    }
+
+    [data-testid="stTextInput"],
+    [data-testid="stTextArea"],
+    div:has(> [data-testid="stTextInput"]),
+    div:has(> [data-testid="stTextArea"]) {
+        overflow: visible !important;
+    }
+
+    [data-testid="stTextInput"] > div,
+    [data-testid="stTextArea"] > div {
+        border: 1px solid transparent !important;
+        border-radius: 12px !important;
+        overflow: visible !important;
+    }
+
+    [data-testid="stTextInput"] > div > div,
+    [data-testid="stTextArea"] > div > div {
+        border-radius: 12px !important;
+    }
+
+    [data-testid="stTextInput"] > div:focus-within,
+    [data-testid="stTextArea"] > div:focus-within {
+        border: 1px solid transparent !important;
+        box-shadow: 0 0 0 1.5px #0F9D6E !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 
 @st.cache_resource
 def configure_llm_settings():
