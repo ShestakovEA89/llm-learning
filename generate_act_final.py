@@ -107,6 +107,10 @@ def generate_act(act_id, output_path, template_path="templates/template.docx"):
     control_rep_designer, control_rep_designer_short = get_person(cur, act_id, "проектировщик, строительный контроль")
     control_rep_subcontractor, control_rep_subcontractor_short = get_person(cur, act_id, "субподрядчик, строительный контроль")
 
+    if not control_rep_subcontractor:
+        control_rep_subcontractor = control_rep_contractor
+        control_rep_subcontractor_short = control_rep_contractor_short
+
     cur.close()
     conn.close()
 
