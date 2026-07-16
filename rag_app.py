@@ -153,6 +153,44 @@ def create_organization(name, role, inn, ogrn, address, phone, sro_info):
     return new_id
 
 
+@st.cache_data(ttl=60)
+def get_work_journal_entries(object_id):
+    conn = psycopg2.connect(SUPABASE_CONNECTION)
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT work_date, location, work_type, description
+        FROM work_journal
+        WHERE object_id = %s
+        ORDER BY work_date DESC
+        LIMIT 20;
+        """,
+        (object_id,),
+    )
+    entries = cur.fetchall()
+    cur.close()
+    conn.close()
+    return entries
+
+
+def create_work_journal_entry(object_id, work_date, location, work_type, description):
+    conn = psycopg2.connect(SUPABASE_CONNECTION)
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO work_journal (object_id, work_date, location, work_type, description)
+        VALUES (%s, %s, %s, %s, %s)
+        RETURNING id;
+        """,
+        (object_id, work_date, location, work_type, description),
+    )
+    new_id = cur.fetchone()[0]
+    conn.commit()
+    cur.close()
+    conn.close()
+    return new_id
+
+
 def create_act(object_id, developer_org_id, contractor_org_id, act_number, date_start, date_end, work_name):
     conn = psycopg2.connect(SUPABASE_CONNECTION)
     cur = conn.cursor()
@@ -171,7 +209,9 @@ def create_act(object_id, developer_org_id, contractor_org_id, act_number, date_
     return new_id
 
 
-tab_chat, tab_new_act = st.tabs(["💬 Чат по документам", "📝 Новый акт скрытых работ"])
+tab_chat, tab_new_act, tab_journal = st.tabs(
+    ["💬 Чат по документам", "📝 Новый акт скрытых работ", "📓 Журнал работ"]
+)
 
 with tab_chat:
     # Показываем список документов прямо в интерфейсе
@@ -403,3 +443,65 @@ with tab_new_act:
                     ):
                         st.session_state.pop(k, None)
                     st.rerun()
+
+with tab_journal:
+    st.subheader("Общий журнал работ")
+
+    journal_objects = get_objects()
+
+    if not journal_objects:
+        st.warning("В таблице objects нет объектов. Сначала добавьте объект.")
+    else:
+        journal_object_choice = st.selectbox(
+            "Объект",
+            options=journal_objects,
+            format_func=lambda o: o[1],
+            key="journal_object_choice",
+        )
+
+        with st.form("new_journal_entry_form", clear_on_submit=True):
+            work_date = st.date_input("Дата работ", value=datetime.date.today())
+            location = st.text_input("Место проведения работ")
+            work_type = st.text_input("Вид работ")
+            description = st.text_area("Подробное описание")
+
+            journal_submitted = st.form_submit_button("Добавить запись")
+
+            if journal_submitted:
+                journal_errors = []
+                if not location.strip():
+                    journal_errors.append("Укажите место проведения работ.")
+                if not work_type.strip():
+                    journal_errors.append("Укажите вид работ.")
+                if not description.strip():
+                    journal_errors.append("Укажите подробное описание.")
+
+                if journal_errors:
+                    for err in journal_errors:
+                        st.error(err)
+                else:
+                    create_work_journal_entry(
+                        object_id=journal_object_choice[0],
+                        work_date=work_date,
+                        location=location.strip(),
+                        work_type=work_type.strip(),
+                        description=description.strip(),
+                    )
+                    st.success("Запись добавлена в журнал работ.")
+                    get_work_journal_entries.clear()
+                    st.rerun()
+
+        st.divider()
+        st.markdown(f"**Последние записи по объекту «{journal_object_choice[1]}»**")
+
+        journal_entries = get_work_journal_entries(journal_object_choice[0])
+        if journal_entries:
+            for entry in journal_entries:
+                entry_date, entry_location, entry_work_type, entry_description = entry
+                with st.container(border=True):
+                    st.markdown(
+                        f"**{entry_date.strftime('%d.%m.%Y')}** · {entry_location} · {entry_work_type}"
+                    )
+                    st.write(entry_description)
+        else:
+            st.info("Записей по этому объекту пока нет.")
