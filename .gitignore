@@ -7,3 +7,5 @@ saved_indexes/
 documents/.DS_Store
 *.docx
 !templates/template.docx
+check_runs.py
+check_template.py
