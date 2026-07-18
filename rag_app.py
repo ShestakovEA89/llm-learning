@@ -248,6 +248,10 @@ def create_act(object_id, developer_org_id, contractor_org_id, act_number, date_
 NEW_OBJECT_OPTION = "➕ Добавить новый объект"
 NEW_ORG_OPTION = "➕ Добавить новую организацию"
 
+OBJECT_PLACEHOLDER = "— Выберите объект —"
+DEVELOPER_PLACEHOLDER = "— Выберите застройщика —"
+CONTRACTOR_PLACEHOLDER = "— Выберите подрядчика —"
+
 TAB_OBJECT_LABEL = "🏗️ Объект"
 TAB_JOURNAL_LABEL = "📓 Журнал работ"
 TAB_NEW_ACT_LABEL = "📝 Новый акт скрытых работ"
@@ -278,9 +282,9 @@ with tab_object:
     obj_developers = get_organizations("застройщик")
     obj_contractors = get_organizations("подрядчик")
 
-    obj_object_options = list(obj_objects) + [(None, NEW_OBJECT_OPTION)]
-    obj_developer_options = list(obj_developers) + [(None, NEW_ORG_OPTION)]
-    obj_contractor_options = list(obj_contractors) + [(None, NEW_ORG_OPTION)]
+    obj_object_options = [(None, OBJECT_PLACEHOLDER)] + list(obj_objects) + [(None, NEW_OBJECT_OPTION)]
+    obj_developer_options = [(None, DEVELOPER_PLACEHOLDER)] + list(obj_developers) + [(None, NEW_ORG_OPTION)]
+    obj_contractor_options = [(None, CONTRACTOR_PLACEHOLDER)] + list(obj_contractors) + [(None, NEW_ORG_OPTION)]
 
     obj_object_choice = st.selectbox(
         "Объект",
@@ -289,7 +293,7 @@ with tab_object:
         key="obj_tab_object_choice",
     )
     new_obj_object = {}
-    if obj_object_choice[0] is None:
+    if obj_object_choice[1] == NEW_OBJECT_OPTION:
         st.caption("Новый объект")
         new_obj_object["name"] = st.text_input("Название объекта", key="obj_tab_new_object_name")
         new_obj_object["address"] = st.text_input("Адрес", key="obj_tab_new_object_address")
@@ -301,7 +305,7 @@ with tab_object:
         key="obj_tab_developer_choice",
     )
     new_obj_developer = {}
-    if obj_developer_choice[0] is None:
+    if obj_developer_choice[1] == NEW_ORG_OPTION:
         st.caption("Новая организация — застройщик")
         new_obj_developer["name"] = st.text_input("Название организации", key="obj_tab_new_developer_name")
         odcol1, odcol2 = st.columns(2)
@@ -320,7 +324,7 @@ with tab_object:
         key="obj_tab_contractor_choice",
     )
     new_obj_contractor = {}
-    if obj_contractor_choice[0] is None:
+    if obj_contractor_choice[1] == NEW_ORG_OPTION:
         st.caption("Новая организация — подрядчик")
         new_obj_contractor["name"] = st.text_input("Название организации", key="obj_tab_new_contractor_name")
         occol1, occol2 = st.columns(2)
@@ -334,17 +338,23 @@ with tab_object:
 
     if st.button("Сохранить", key="obj_tab_save"):
         obj_errors = []
-        if obj_object_choice[0] is None:
+        if obj_object_choice[1] == OBJECT_PLACEHOLDER:
+            obj_errors.append("Выберите объект или создайте новый.")
+        elif obj_object_choice[1] == NEW_OBJECT_OPTION:
             if not new_obj_object["name"].strip() or not new_obj_object["address"].strip():
                 obj_errors.append("Заполните все обязательные поля нового объекта.")
 
-        if obj_developer_choice[0] is None:
+        if obj_developer_choice[1] == DEVELOPER_PLACEHOLDER:
+            obj_errors.append("Выберите застройщика или создайте новую организацию.")
+        elif obj_developer_choice[1] == NEW_ORG_OPTION:
             if not new_obj_developer["name"].strip() or not new_obj_developer["inn"].strip() \
                     or not new_obj_developer["ogrn"].strip() or not new_obj_developer["address"].strip() \
                     or not new_obj_developer["phone"].strip():
                 obj_errors.append("Заполните все обязательные поля новой организации-застройщика.")
 
-        if obj_contractor_choice[0] is None:
+        if obj_contractor_choice[1] == CONTRACTOR_PLACEHOLDER:
+            obj_errors.append("Выберите подрядчика или создайте новую организацию.")
+        elif obj_contractor_choice[1] == NEW_ORG_OPTION:
             if not new_obj_contractor["name"].strip() or not new_obj_contractor["inn"].strip() \
                     or not new_obj_contractor["ogrn"].strip() or not new_obj_contractor["address"].strip() \
                     or not new_obj_contractor["phone"].strip():
