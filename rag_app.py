@@ -227,16 +227,81 @@ def create_work_journal_entry(object_id, work_date, location, work_type, descrip
     return new_id
 
 
-def create_act(object_id, developer_org_id, contractor_org_id, act_number, date_start, date_end, act_date, work_name):
+def create_act(object_id, developer_org_id, contractor_org_id, act_number, date_start, date_end, act_date, work_name, designer_org_id=None):
     conn = psycopg2.connect(SUPABASE_CONNECTION)
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO acts (object_id, developer_org_id, contractor_org_id, act_number, date_start, date_end, act_date, work_name)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO acts (object_id, developer_org_id, contractor_org_id, act_number, date_start, date_end, act_date, work_name, designer_org_id)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id;
         """,
-        (object_id, developer_org_id, contractor_org_id, act_number, date_start, date_end, act_date, work_name),
+        (object_id, developer_org_id, contractor_org_id, act_number, date_start, date_end, act_date, work_name, designer_org_id),
+    )
+    new_id = cur.fetchone()[0]
+    conn.commit()
+    cur.close()
+    conn.close()
+    return new_id
+
+
+def create_act_signatory(act_id, person_id, role):
+    conn = psycopg2.connect(SUPABASE_CONNECTION)
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO act_signatories (act_id, person_id, role)
+        VALUES (%s, %s, %s);
+        """,
+        (act_id, person_id, role),
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+@st.cache_data(ttl=60)
+def get_all_organizations():
+    conn = psycopg2.connect(SUPABASE_CONNECTION)
+    cur = conn.cursor()
+    cur.execute("SELECT id, name, role FROM organizations ORDER BY name;")
+    orgs = cur.fetchall()
+    cur.close()
+    conn.close()
+    return orgs
+
+
+@st.cache_data(ttl=60)
+def get_responsible_persons(organization_ids):
+    if not organization_ids:
+        return []
+    conn = psycopg2.connect(SUPABASE_CONNECTION)
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT id, full_name, position, order_number, order_date, registry_number, organization_id
+        FROM responsible_persons
+        WHERE organization_id = ANY(%s)
+        ORDER BY full_name;
+        """,
+        (list(organization_ids),),
+    )
+    persons = cur.fetchall()
+    cur.close()
+    conn.close()
+    return persons
+
+
+def create_responsible_person(organization_id, full_name, position, order_number, order_date, registry_number):
+    conn = psycopg2.connect(SUPABASE_CONNECTION)
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO responsible_persons (organization_id, full_name, position, order_number, order_date, registry_number)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        RETURNING id;
+        """,
+        (organization_id, full_name, position, order_number, order_date, registry_number or None),
     )
     new_id = cur.fetchone()[0]
     conn.commit()
@@ -251,6 +316,7 @@ NEW_ORG_OPTION = "➕ Добавить новую организацию"
 OBJECT_PLACEHOLDER = "— Выберите объект —"
 DEVELOPER_PLACEHOLDER = "— Выберите застройщика —"
 CONTRACTOR_PLACEHOLDER = "— Выберите подрядчика —"
+OTHER_ORG_OPTION = "— Другая организация из базы —"
 
 TAB_OBJECT_LABEL = "🏗️ Объект"
 TAB_JOURNAL_LABEL = "📓 Журнал работ"
@@ -439,6 +505,102 @@ with tab_object:
             f"Подрядчик: {cur_obj['contractor_name']}"
         )
 
+        st.divider()
+        st.subheader("Представители организаций")
+        st.caption("Добавьте представителей застройщика и подрядчика для текущего объекта.")
+
+        rep_org_options = [
+            (cur_obj["developer_id"], f"Застройщик: {cur_obj['developer_name']}"),
+            (cur_obj["contractor_id"], f"Подрядчик: {cur_obj['contractor_name']}"),
+            (None, OTHER_ORG_OPTION),
+        ]
+        rep_org_choice = st.selectbox(
+            "Организация представителя",
+            options=rep_org_options,
+            format_func=lambda o: o[1],
+            key="rep_org_choice",
+        )
+
+        rep_organization_id = rep_org_choice[0]
+        if rep_org_choice[1] == OTHER_ORG_OPTION:
+            rep_all_orgs = get_all_organizations()
+            rep_other_org_options = [(None, "— Выберите организацию —")] + [
+                (o[0], f"{o[1]} ({o[2]})") for o in rep_all_orgs
+            ]
+            rep_other_org_choice = st.selectbox(
+                "Организация",
+                options=rep_other_org_options,
+                format_func=lambda o: o[1],
+                key="rep_other_org_choice",
+            )
+            rep_organization_id = rep_other_org_choice[0]
+
+        rep_full_name = st.text_input("ФИО", key="rep_full_name")
+        rep_position = st.text_input("Должность", key="rep_position")
+        rep_col1, rep_col2 = st.columns(2)
+        with rep_col1:
+            rep_order_number = st.text_input("Номер приказа", key="rep_order_number")
+        with rep_col2:
+            rep_order_date = st.date_input("Дата приказа", value=datetime.date.today(), key="rep_order_date")
+        rep_registry_number = st.text_input(
+            "№ в реестре специалистов (необязательно)", key="rep_registry_number"
+        )
+
+        if st.button("Добавить представителя", key="rep_add_button"):
+            rep_errors = []
+            if rep_organization_id is None:
+                rep_errors.append("Выберите организацию представителя.")
+            if not rep_full_name.strip():
+                rep_errors.append("Укажите ФИО.")
+            if not rep_position.strip():
+                rep_errors.append("Укажите должность.")
+            if not rep_order_number.strip():
+                rep_errors.append("Укажите номер приказа.")
+
+            if rep_errors:
+                for err in rep_errors:
+                    st.error(err)
+            else:
+                create_responsible_person(
+                    organization_id=rep_organization_id,
+                    full_name=rep_full_name.strip(),
+                    position=rep_position.strip(),
+                    order_number=rep_order_number.strip(),
+                    order_date=rep_order_date,
+                    registry_number=rep_registry_number.strip(),
+                )
+                get_responsible_persons.clear()
+                for k in ("rep_full_name", "rep_position", "rep_order_number", "rep_registry_number"):
+                    st.session_state.pop(k, None)
+                st.success(f"Представитель «{rep_full_name.strip()}» добавлен.")
+                st.rerun()
+
+        st.divider()
+        st.markdown("**Уже добавленные представители**")
+
+        rep_org_ids = [cur_obj["developer_id"], cur_obj["contractor_id"]]
+        rep_persons = get_responsible_persons(rep_org_ids)
+
+        if not rep_persons:
+            st.info("Представители для этого объекта пока не добавлены.")
+        else:
+            rep_role_by_org = {
+                cur_obj["developer_id"]: f"Застройщик: {cur_obj['developer_name']}",
+                cur_obj["contractor_id"]: f"Подрядчик: {cur_obj['contractor_name']}",
+            }
+            for rep_person in rep_persons:
+                (rep_person_id, rep_person_full_name, rep_person_position, rep_person_order_number,
+                 rep_person_order_date, rep_person_registry_number, rep_person_org_id) = rep_person
+                with st.container(border=True):
+                    st.markdown(f"**{rep_person_full_name}** · {rep_person_position}")
+                    st.caption(rep_role_by_org.get(rep_person_org_id, "Организация"))
+                    rep_order_date_str = (
+                        rep_person_order_date.strftime("%d.%m.%Y") if rep_person_order_date else "—"
+                    )
+                    st.write(f"Приказ №{rep_person_order_number} от {rep_order_date_str}")
+                    if rep_person_registry_number:
+                        st.write(f"№ в реестре специалистов: {rep_person_registry_number}")
+
 with tab_chat:
     st.write("Документы сохраняются в облаке — не нужно загружать их заново каждый раз")
 
@@ -576,6 +738,97 @@ with tab_new_act:
                 key=f"act_work_name_{object_id}_{date_start}_{date_end}",
             )
 
+            st.divider()
+            st.markdown("**Подписанты акта**")
+
+            act_developer_control_persons = get_responsible_persons([developer_org_id])
+            act_contractor_persons = get_responsible_persons([contractor_org_id])
+
+            act_developer_control_person_choice = (None, None)
+            if not act_developer_control_persons:
+                st.info("Сначала добавьте представителя на вкладке «Объект».")
+            else:
+                act_developer_control_person_options = [(None, "— Выберите представителя —")] + [
+                    (p[0], p[1]) for p in act_developer_control_persons
+                ]
+                act_developer_control_person_choice = st.selectbox(
+                    "Представитель застройщика по строительному контролю",
+                    options=act_developer_control_person_options,
+                    format_func=lambda o: o[1],
+                    key="act_developer_control_person",
+                )
+
+            act_contractor_person_choice = (None, None)
+            act_contractor_control_person_choice = (None, None)
+            if not act_contractor_persons:
+                st.info("Сначала добавьте представителя на вкладке «Объект».")
+            else:
+                act_contractor_person_options = [(None, "— Выберите представителя —")] + [
+                    (p[0], p[1]) for p in act_contractor_persons
+                ]
+                act_contractor_person_choice = st.selectbox(
+                    "Представитель подрядчика",
+                    options=act_contractor_person_options,
+                    format_func=lambda o: o[1],
+                    key="act_contractor_person",
+                )
+                act_contractor_control_person_choice = st.selectbox(
+                    "Представитель подрядчика по строительному контролю",
+                    options=act_contractor_person_options,
+                    format_func=lambda o: o[1],
+                    key="act_contractor_control_person",
+                )
+
+            st.markdown("**Представитель субподрядчика по строительному контролю (необязательно)**")
+            act_subcontractor_orgs = get_organizations("подрядчик")
+            act_subcontractor_org_options = [(None, "— Не указывать —")] + list(act_subcontractor_orgs)
+            act_subcontractor_org_choice = st.selectbox(
+                "Организация субподрядчика",
+                options=act_subcontractor_org_options,
+                format_func=lambda o: o[1],
+                key="act_subcontractor_org",
+            )
+            act_subcontractor_control_person_choice = (None, None)
+            if act_subcontractor_org_choice[0] is not None:
+                act_subcontractor_persons = get_responsible_persons([act_subcontractor_org_choice[0]])
+                if not act_subcontractor_persons:
+                    st.info("Сначала добавьте представителя на вкладке «Объект».")
+                else:
+                    act_subcontractor_person_options = [(None, "— Выберите представителя —")] + [
+                        (p[0], p[1]) for p in act_subcontractor_persons
+                    ]
+                    act_subcontractor_control_person_choice = st.selectbox(
+                        "Представитель субподрядчика",
+                        options=act_subcontractor_person_options,
+                        format_func=lambda o: o[1],
+                        key="act_subcontractor_control_person",
+                    )
+
+            st.markdown("**Представитель проектировщика по строительному контролю (необязательно)**")
+            act_designer_orgs = get_organizations("проектировщик")
+            act_designer_org_options = [(None, "— Не указывать —")] + list(act_designer_orgs)
+            act_designer_org_choice = st.selectbox(
+                "Организация проектировщика",
+                options=act_designer_org_options,
+                format_func=lambda o: o[1],
+                key="act_designer_org",
+            )
+            act_designer_control_person_choice = (None, None)
+            if act_designer_org_choice[0] is not None:
+                act_designer_persons = get_responsible_persons([act_designer_org_choice[0]])
+                if not act_designer_persons:
+                    st.info("Сначала добавьте представителя на вкладке «Объект».")
+                else:
+                    act_designer_person_options = [(None, "— Выберите представителя —")] + [
+                        (p[0], p[1]) for p in act_designer_persons
+                    ]
+                    act_designer_control_person_choice = st.selectbox(
+                        "Представитель проектировщика",
+                        options=act_designer_person_options,
+                        format_func=lambda o: o[1],
+                        key="act_designer_control_person",
+                    )
+
             submitted = st.form_submit_button("Сохранить акт")
 
             if submitted:
@@ -586,6 +839,21 @@ with tab_new_act:
                     errors.append("Укажите описание работ.")
                 if date_end < date_start:
                     errors.append("Дата окончания не может быть раньше даты начала.")
+                if act_developer_control_person_choice[0] is None:
+                    errors.append(
+                        "Выберите представителя застройщика по строительному контролю "
+                        "(сначала добавьте представителя на вкладке «Объект»)."
+                    )
+                if act_contractor_person_choice[0] is None:
+                    errors.append(
+                        "Выберите представителя подрядчика "
+                        "(сначала добавьте представителя на вкладке «Объект»)."
+                    )
+                if act_contractor_control_person_choice[0] is None:
+                    errors.append(
+                        "Выберите представителя подрядчика по строительному контролю "
+                        "(сначала добавьте представителя на вкладке «Объект»)."
+                    )
 
                 if errors:
                     for err in errors:
@@ -600,7 +868,23 @@ with tab_new_act:
                         date_end=date_end,
                         act_date=date_end,
                         work_name=work_name.strip(),
+                        designer_org_id=act_designer_org_choice[0],
                     )
+                    create_act_signatory(
+                        new_id, act_developer_control_person_choice[0], "застройщик, строительный контроль"
+                    )
+                    create_act_signatory(new_id, act_contractor_person_choice[0], "подрядчик")
+                    create_act_signatory(
+                        new_id, act_contractor_control_person_choice[0], "подрядчик, строительный контроль"
+                    )
+                    if act_subcontractor_control_person_choice[0] is not None:
+                        create_act_signatory(
+                            new_id, act_subcontractor_control_person_choice[0], "субподрядчик, строительный контроль"
+                        )
+                    if act_designer_control_person_choice[0] is not None:
+                        create_act_signatory(
+                            new_id, act_designer_control_person_choice[0], "проектировщик, строительный контроль"
+                        )
                     st.success(f"Акт №{act_number} сохранён (id={new_id}).")
                     st.rerun()
 with tab_journal:
