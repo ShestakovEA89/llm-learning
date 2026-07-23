@@ -10,3 +10,4 @@ documents/.DS_Store
 check_runs.py
 check_template.py
 migrate_add_org_links.py
+migrate_add_commission_acts.py
