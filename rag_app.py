@@ -289,6 +289,43 @@ def create_act_signatory(act_id, person_id, role):
     conn.close()
 
 
+def create_material(act_id, material_name, certificate_number, valid_from, valid_to):
+    conn = psycopg2.connect(SUPABASE_CONNECTION)
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO materials (act_id, material_name, certificate_number, certificate_valid_from, certificate_valid_to)
+        VALUES (%s, %s, %s, %s, %s)
+        RETURNING id;
+        """,
+        (act_id, material_name, certificate_number, valid_from, valid_to),
+    )
+    new_id = cur.fetchone()[0]
+    conn.commit()
+    cur.close()
+    conn.close()
+    return new_id
+
+
+@st.cache_data(ttl=60)
+def get_materials_for_act(act_id):
+    conn = psycopg2.connect(SUPABASE_CONNECTION)
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT id, material_name, certificate_number, certificate_valid_from, certificate_valid_to
+        FROM materials
+        WHERE act_id = %s
+        ORDER BY id;
+        """,
+        (act_id,),
+    )
+    materials = cur.fetchall()
+    cur.close()
+    conn.close()
+    return materials
+
+
 @st.cache_data(ttl=60)
 def get_all_organizations():
     conn = psycopg2.connect(SUPABASE_CONNECTION)
@@ -935,8 +972,64 @@ with tab_new_act:
                         create_act_signatory(
                             new_id, act_designer_control_person_choice[0], "проектировщик, строительный контроль"
                         )
+                    st.session_state.current_act = {
+                        "act_id": new_id,
+                        "act_number": act_number.strip(),
+                    }
                     st.success(f"Акт №{act_number} сохранён (id={new_id}).")
                     st.rerun()
+
+        if "current_act" in st.session_state:
+            cur_act = st.session_state.current_act
+            st.divider()
+            st.subheader("Добавить материалы")
+            st.caption(f"Материалы для акта №{cur_act['act_number']} (id={cur_act['act_id']}).")
+
+            with st.form(f"add_material_form_{cur_act['act_id']}", clear_on_submit=True):
+                material_name = st.text_input("Название материала", key="material_name")
+                certificate_number = st.text_input("Номер сертификата", key="material_certificate_number")
+                mat_col1, mat_col2 = st.columns(2)
+                with mat_col1:
+                    certificate_valid_from = st.date_input(
+                        "Срок действия с", value=None, key="material_valid_from"
+                    )
+                with mat_col2:
+                    certificate_valid_to = st.date_input(
+                        "Срок действия по", value=None, key="material_valid_to"
+                    )
+
+                material_submitted = st.form_submit_button("Добавить материал")
+
+                if material_submitted:
+                    if not material_name.strip():
+                        st.error("Укажите название материала.")
+                    else:
+                        create_material(
+                            act_id=cur_act["act_id"],
+                            material_name=material_name.strip(),
+                            certificate_number=certificate_number.strip() or None,
+                            valid_from=certificate_valid_from,
+                            valid_to=certificate_valid_to,
+                        )
+                        get_materials_for_act.clear()
+                        st.success(f"Материал «{material_name.strip()}» добавлен.")
+                        st.rerun()
+
+            st.markdown("**Уже добавленные материалы**")
+            act_materials = get_materials_for_act(cur_act["act_id"])
+            if not act_materials:
+                st.info("Материалы для этого акта пока не добавлены.")
+            else:
+                for mat in act_materials:
+                    mat_id, mat_name, mat_cert_number, mat_valid_from, mat_valid_to = mat
+                    with st.container(border=True):
+                        st.markdown(f"**{mat_name}**")
+                        if mat_cert_number:
+                            st.write(f"Сертификат: {mat_cert_number}")
+                        if mat_valid_from or mat_valid_to:
+                            from_str = mat_valid_from.strftime("%d.%m.%Y") if mat_valid_from else "—"
+                            to_str = mat_valid_to.strftime("%d.%m.%Y") if mat_valid_to else "—"
+                            st.write(f"Срок действия: {from_str} — {to_str}")
 with tab_journal:
     st.subheader("Общий журнал работ")
 
