@@ -9,3 +9,4 @@ documents/.DS_Store
 !templates/template.docx
 check_runs.py
 check_template.py
+migrate_add_org_links.py

@@ -124,6 +124,20 @@ def get_objects():
 
 
 @st.cache_data(ttl=60)
+def get_object_org_links(object_id):
+    conn = psycopg2.connect(SUPABASE_CONNECTION)
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT developer_org_id, contractor_org_id FROM objects WHERE id = %s;",
+        (object_id,),
+    )
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    return row if row else (None, None)
+
+
+@st.cache_data(ttl=60)
 def get_organizations(role):
     conn = psycopg2.connect(SUPABASE_CONNECTION)
     cur = conn.cursor()
@@ -150,6 +164,21 @@ def create_object(name, address):
     cur.close()
     conn.close()
     return new_id
+
+
+def update_object_org_links(object_id, developer_org_id, contractor_org_id):
+    conn = psycopg2.connect(SUPABASE_CONNECTION)
+    cur = conn.cursor()
+    cur.execute(
+        """
+        UPDATE objects SET developer_org_id = %s, contractor_org_id = %s
+        WHERE id = %s;
+        """,
+        (developer_org_id, contractor_org_id, object_id),
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
 
 
 def create_organization(name, role, inn, ogrn, address, phone, sro_info):
@@ -364,6 +393,24 @@ with tab_object:
         new_obj_object["name"] = st.text_input("Название объекта", key="obj_tab_new_object_name")
         new_obj_object["address"] = st.text_input("Адрес", key="obj_tab_new_object_address")
 
+    if "obj_tab_last_object_id" not in st.session_state:
+        st.session_state.obj_tab_last_object_id = None
+
+    if obj_object_choice[0] != st.session_state.obj_tab_last_object_id:
+        st.session_state.obj_tab_last_object_id = obj_object_choice[0]
+        if obj_object_choice[0] is not None:
+            linked_developer_id, linked_contractor_id = get_object_org_links(obj_object_choice[0])
+            if linked_developer_id is not None:
+                for linked_dev_option in obj_developer_options:
+                    if linked_dev_option[0] == linked_developer_id:
+                        st.session_state.obj_tab_developer_choice = linked_dev_option
+                        break
+            if linked_contractor_id is not None:
+                for linked_con_option in obj_contractor_options:
+                    if linked_con_option[0] == linked_contractor_id:
+                        st.session_state.obj_tab_contractor_choice = linked_con_option
+                        break
+
     obj_developer_choice = st.selectbox(
         "Застройщик",
         options=obj_developer_options,
@@ -474,6 +521,9 @@ with tab_object:
             else:
                 contractor_id = obj_contractor_choice[0]
                 contractor_name = obj_contractor_choice[1]
+
+            update_object_org_links(object_id, developer_id, contractor_id)
+            get_object_org_links.clear()
 
             st.session_state.current_object = {
                 "object_id": object_id,
