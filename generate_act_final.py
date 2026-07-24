@@ -22,23 +22,27 @@ def fmt_date(d: date) -> str:
     return f"«{d.strftime('%d')}» {month_name} {d.year} г."
 
 
-def get_org_details(cur, act_id, role_keyword):
-    cur.execute("""
-        SELECT org.name, org.ogrn, org.inn, org.address, org.phone, org.sro_info
-        FROM act_signatories s
-        JOIN responsible_persons rp ON s.person_id = rp.id
-        JOIN organizations org ON rp.organization_id = org.id
-        WHERE s.act_id = %s AND s.role ILIKE %s
-        LIMIT 1
-    """, (act_id, f"%{role_keyword}%"))
-    row = cur.fetchone()
-    if not row:
-        return "", ""
-    name, ogrn, inn, address, phone, sro_info = row
-    details = f"{name}, ОГРН {ogrn or 'б/н'}, ИНН {inn}, {address}, тел. {phone}"
-    if sro_info:
-        details += f", {sro_info}"
-    return name, details
+def get_org_details(cur, act_id, roles):
+    """roles: exact role string, or list of exact role strings tried in priority order."""
+    if isinstance(roles, str):
+        roles = [roles]
+    for role in roles:
+        cur.execute("""
+            SELECT org.name, org.ogrn, org.inn, org.address, org.phone, org.sro_info
+            FROM act_signatories s
+            JOIN responsible_persons rp ON s.person_id = rp.id
+            JOIN organizations org ON rp.organization_id = org.id
+            WHERE s.act_id = %s AND s.role = %s
+            LIMIT 1
+        """, (act_id, role))
+        row = cur.fetchone()
+        if row:
+            name, ogrn, inn, address, phone, sro_info = row
+            details = f"{name}, ОГРН {ogrn or 'б/н'}, ИНН {inn}, {address}, тел. {phone}"
+            if sro_info:
+                details += f", {sro_info}"
+            return name, details
+    return "", ""
 
 
 def get_person(cur, act_id, role_exact):
@@ -83,8 +87,10 @@ def generate_act(act_id, output_path, template_path="templates/template.docx"):
     materials = cur.fetchall()
     materials_list = "; ".join(f"{name} ({cert})" for name, cert in materials)
 
-    customer_name, customer_details = get_org_details(cur, act_id, "застройщик")
-    contractor_name, contractor_details = get_org_details(cur, act_id, "подрядчик")
+    customer_name, customer_details = get_org_details(cur, act_id, "застройщик, строительный контроль")
+    contractor_name, contractor_details = get_org_details(
+        cur, act_id, ["субподрядчик, строительный контроль", "подрядчик"]
+    )
 
     cur.execute("""
         SELECT org.name, org.ogrn, org.inn, org.address, org.phone, org.sro_info
@@ -156,3 +162,6 @@ def generate_act(act_id, output_path, template_path="templates/template.docx"):
 if __name__ == "__main__":
     generate_act(act_id=1, output_path="final_act_1.docx")
     generate_act(act_id=2, output_path="final_act_2.docx")
+    generate_act(act_id=10, output_path="final_act_10.docx")
+    generate_act(act_id=11, output_path="final_act_11.docx")
+    generate_act(act_id=12, output_path="final_act_12.docx")
