@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+import re
 import psycopg2
 import datetime
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings, StorageContext
@@ -399,6 +400,50 @@ def get_commission_act_signatories(commission_act_id):
 
 
 @st.cache_data(ttl=60)
+def get_registries_for_object(object_id):
+    conn = psycopg2.connect(SUPABASE_CONNECTION)
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT id, work_section_name, project_marks
+        FROM registries
+        WHERE object_id = %s
+        ORDER BY id;
+        """,
+        (object_id,),
+    )
+    registries = cur.fetchall()
+    cur.close()
+    conn.close()
+    return registries
+
+
+def _natural_sort_key(seq_number):
+    seq_number = seq_number or ""
+    return [int(part) if part.isdigit() else part for part in re.split(r"(\d+)", seq_number)]
+
+
+@st.cache_data(ttl=60)
+def get_registry_documents(registry_id):
+    conn = psycopg2.connect(SUPABASE_CONNECTION)
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT id, seq_number, is_category_header, document_name, document_number_date,
+               issuing_org, page_count, note
+        FROM registry_documents
+        WHERE registry_id = %s;
+        """,
+        (registry_id,),
+    )
+    documents = cur.fetchall()
+    cur.close()
+    conn.close()
+    documents.sort(key=lambda row: _natural_sort_key(row[1]))
+    return documents
+
+
+@st.cache_data(ttl=60)
 def get_all_organizations():
     conn = psycopg2.connect(SUPABASE_CONNECTION)
     cur = conn.cursor()
@@ -683,6 +728,41 @@ with tab_object:
             f"Застройщик: {cur_obj['developer_name']}  \n"
             f"Подрядчик: {cur_obj['contractor_name']}"
         )
+
+        st.divider()
+        st.subheader("📋 Реестры исполнительной документации")
+
+        obj_registries = get_registries_for_object(cur_obj["object_id"])
+        if not obj_registries:
+            st.info("Реестры для этого объекта пока не добавлены.")
+        else:
+            registry_options = [(None, "— Выберите реестр —")] + [
+                (r[0], f"{r[1]} ({r[2]})" if r[2] else r[1]) for r in obj_registries
+            ]
+            registry_choice = st.selectbox(
+                "Реестр",
+                options=registry_options,
+                format_func=lambda o: o[1],
+                key="registry_choice",
+            )
+            if registry_choice[0] is not None:
+                registry_docs = get_registry_documents(registry_choice[0])
+                if not registry_docs:
+                    st.info("В этом реестре пока нет документов.")
+                for reg_doc in registry_docs:
+                    (reg_doc_id, reg_doc_seq, reg_doc_is_header, reg_doc_name, reg_doc_number_date,
+                     reg_doc_issuing_org, reg_doc_page_count, reg_doc_note) = reg_doc
+                    if reg_doc_is_header:
+                        st.markdown(f"**{reg_doc_seq}. {reg_doc_name}**" if reg_doc_seq else f"**{reg_doc_name}**")
+                    else:
+                        reg_cols = st.columns([0.6, 3, 2, 2, 0.8])
+                        reg_cols[0].write(reg_doc_seq or "")
+                        reg_cols[1].write(reg_doc_name or "")
+                        reg_cols[2].write(reg_doc_number_date or "")
+                        reg_cols[3].write(reg_doc_issuing_org or "")
+                        reg_cols[4].write(reg_doc_page_count or "")
+                        if reg_doc_note:
+                            st.caption(reg_doc_note)
 
         st.divider()
         st.subheader("Представители организаций")
