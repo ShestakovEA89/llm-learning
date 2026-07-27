@@ -558,7 +558,7 @@ with tab_object:
     obj_object_choice = st.selectbox(
         "Объект",
         options=obj_object_options,
-        format_func=lambda o: o[1],
+        format_func=lambda o: f"{o[1]}, {o[2]}" if o[0] is not None else o[1],
         key="obj_tab_object_choice",
     )
     new_obj_object = {}
