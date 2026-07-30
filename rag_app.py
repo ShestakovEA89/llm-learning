@@ -259,16 +259,16 @@ def create_work_journal_entry(object_id, work_date, location, work_type, descrip
     return new_id
 
 
-def create_act(object_id, developer_org_id, contractor_org_id, act_number, date_start, date_end, act_date, work_name, designer_org_id=None):
+def create_act(object_id, developer_org_id, contractor_org_id, act_number, date_start, date_end, act_date, work_name, designer_org_id=None, project_docs_ref=None, normative_docs=None, supporting_docs=None):
     conn = psycopg2.connect(SUPABASE_CONNECTION)
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO acts (object_id, developer_org_id, contractor_org_id, act_number, date_start, date_end, act_date, work_name, designer_org_id)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO acts (object_id, developer_org_id, contractor_org_id, act_number, date_start, date_end, act_date, work_name, designer_org_id, project_docs_ref, normative_docs, supporting_docs)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id;
         """,
-        (object_id, developer_org_id, contractor_org_id, act_number, date_start, date_end, act_date, work_name, designer_org_id),
+        (object_id, developer_org_id, contractor_org_id, act_number, date_start, date_end, act_date, work_name, designer_org_id, project_docs_ref, normative_docs, supporting_docs),
     )
     new_id = cur.fetchone()[0]
     conn.commit()
@@ -1017,6 +1017,9 @@ with tab_new_act:
                 value=auto_work_name,
                 key=f"act_work_name_{object_id}_{date_start}_{date_end}",
             )
+            project_docs_ref = st.text_area("Шифр проектной документации", key="act_project_docs_ref")
+            normative_docs = st.text_area("Нормативные документы", key="act_normative_docs")
+            supporting_docs = st.text_area("Прилагаемые документы", key="act_supporting_docs")
 
             st.divider()
             st.markdown("**Подписанты акта**")
@@ -1149,6 +1152,9 @@ with tab_new_act:
                         act_date=date_end,
                         work_name=work_name.strip(),
                         designer_org_id=act_designer_org_choice[0],
+                        project_docs_ref=project_docs_ref.strip() or None,
+                        normative_docs=normative_docs.strip() or None,
+                        supporting_docs=supporting_docs.strip() or None,
                     )
                     create_act_signatory(
                         new_id, act_developer_control_person_choice[0], "застройщик, строительный контроль"
