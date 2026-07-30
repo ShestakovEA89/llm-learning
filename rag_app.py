@@ -2,6 +2,7 @@ import streamlit as st
 import os
 import io
 import datetime
+import anthropic
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings, StorageContext
 from llama_index.llms.anthropic import Anthropic
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
@@ -16,7 +17,13 @@ from persons import get_responsible_persons, create_responsible_person
 from acts import create_act, create_act_signatory, create_material, get_acts_for_object, get_materials_for_act
 from journal import get_work_journal_entries, get_work_journal_entries_for_period, create_work_journal_entry
 from commission_acts import create_commission_act, create_commission_act_signatory, get_commission_acts_for_object, get_commission_act_signatories
-from registries import get_registries_for_object, get_registry_documents
+from registries import (
+    get_registries_for_object,
+    get_registry_documents,
+    create_registry,
+    parse_registry_text,
+    create_registry_documents_bulk,
+)
 from documents import get_document_list
 
 load_dotenv()
@@ -344,6 +351,28 @@ with tab_object:
         st.divider()
         st.subheader("📋 Реестры исполнительной документации")
 
+        with st.expander("➕ Создать новый реестр"):
+            new_registry_section_name = st.text_input(
+                "Название раздела", key="new_registry_section_name"
+            )
+            new_registry_project_marks = st.text_input(
+                "Шифр проекта (необязательно)", key="new_registry_project_marks"
+            )
+            if st.button("Создать реестр", key="create_registry_btn"):
+                if not new_registry_section_name.strip():
+                    st.error("Укажите название раздела.")
+                else:
+                    create_registry(
+                        cur_obj["object_id"],
+                        new_registry_section_name.strip(),
+                        new_registry_project_marks.strip() or None,
+                    )
+                    get_registries_for_object.clear()
+                    st.session_state.pop("new_registry_section_name", None)
+                    st.session_state.pop("new_registry_project_marks", None)
+                    st.success(f"Реестр создан: {new_registry_section_name.strip()}")
+                    st.rerun()
+
         obj_registries = get_registries_for_object(cur_obj["object_id"])
         if not obj_registries:
             st.info("Реестры для этого объекта пока не добавлены.")
@@ -375,6 +404,55 @@ with tab_object:
                         reg_cols[4].write(reg_doc_page_count or "")
                         if reg_doc_note:
                             st.caption(reg_doc_note)
+
+                st.markdown("###### Массовое добавление строк через текст реестра")
+                registry_raw_text = st.text_area(
+                    "Вставьте текст реестра",
+                    height=200,
+                    key="registry_raw_text",
+                )
+                if st.button("Разобрать", key="registry_parse_btn"):
+                    if not registry_raw_text.strip():
+                        st.error("Вставьте текст реестра для разбора.")
+                    else:
+                        with st.spinner("Разбираю текст реестра..."):
+                            try:
+                                parsed_rows = parse_registry_text(registry_raw_text)
+                            except ValueError as parse_err:
+                                st.error(f"Не удалось разобрать ответ Claude: {parse_err}")
+                            except anthropic.APIError as api_err:
+                                st.error(f"Ошибка обращения к Claude API: {api_err}")
+                            else:
+                                if not isinstance(parsed_rows, list):
+                                    st.error("Claude вернул не список строк — попробуйте ещё раз.")
+                                else:
+                                    st.session_state.registry_parsed_rows = parsed_rows
+                                    st.session_state.registry_parsed_for_id = registry_choice[0]
+                                    st.success(f"Разобрано строк: {len(parsed_rows)}")
+
+                if (
+                    st.session_state.get("registry_parsed_rows")
+                    and st.session_state.get("registry_parsed_for_id") == registry_choice[0]
+                ):
+                    parsed_preview_rows = st.session_state.registry_parsed_rows
+                    st.markdown(f"**Предпросмотр: {len(parsed_preview_rows)} строк**")
+                    st.dataframe(
+                        parsed_preview_rows,
+                        use_container_width=True,
+                        column_order=[
+                            "seq_number", "is_category_header", "document_name",
+                            "document_number_date", "issuing_org", "page_count", "note",
+                        ],
+                    )
+
+                    if st.button("Сохранить все строки", key="registry_save_parsed_btn"):
+                        create_registry_documents_bulk(registry_choice[0], parsed_preview_rows)
+                        get_registry_documents.clear()
+                        st.session_state.pop("registry_parsed_rows", None)
+                        st.session_state.pop("registry_parsed_for_id", None)
+                        st.session_state.pop("registry_raw_text", None)
+                        st.success(f"Сохранено строк: {len(parsed_preview_rows)}")
+                        st.rerun()
 
         st.divider()
         st.subheader("Представители организаций")
