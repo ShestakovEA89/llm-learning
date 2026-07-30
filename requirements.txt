@@ -7,3 +7,5 @@ llama-index-embeddings-huggingface
 llama-index-readers-file
 llama-index-vector-stores-supabase
 pypdf
+docxtpl
+psycopg2-binary
