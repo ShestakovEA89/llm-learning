@@ -2,7 +2,6 @@ import streamlit as st
 import os
 import re
 import io
-import psycopg2
 import datetime
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings, StorageContext
 from llama_index.llms.anthropic import Anthropic
