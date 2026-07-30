@@ -58,8 +58,17 @@ streamlit run rag_app.py
 
 ## Структура проекта
 
-- `rag_app.py` — основное Streamlit-приложение (RAG-чат с персистентностью в Supabase)
+- `rag_app.py` — основное Streamlit-приложение (UI, вкладки, RAG-чат); функции работы с БД вынесены в отдельные модули ниже
+- `db.py` — подключение к Supabase (`get_db_connection`, `SUPABASE_CONNECTION`)
+- `objects.py` — объекты строительства (`get_objects`, `get_object_org_links`, `create_object`, `update_object_org_links`)
+- `organizations.py` — организации (`get_organizations`, `get_all_organizations`, `create_organization`)
+- `persons.py` — ответственные лица (`get_responsible_persons`, `create_responsible_person`)
+- `acts.py` — акты скрытых работ, подписанты, материалы (`get_acts_for_object`, `create_act`, `create_act_signatory`, `get_materials_for_act`, `create_material`)
+- `journal.py` — журнал производства работ (`get_work_journal_entries`, `get_work_journal_entries_for_period`, `create_work_journal_entry`)
+- `commission_acts.py` — комиссионные акты и их подписанты (`create_commission_act`, `get_commission_acts_for_object`, `create_commission_act_signatory`, `get_commission_act_signatories`)
+- `registries.py` — реестры исполнительной документации (`get_registries_for_object`, `get_registry_documents`)
+- `documents.py` — список загруженных в базу документов для RAG-чата (`get_document_list`)
+- `generate_act_final.py` — генерация .docx актов по шаблону
+- `templates/` — шаблоны документов (.docx)
 - `requirements.txt` — зависимости проекта
 - `uploaded_docs/` — локально сохранённые загруженные PDF (не хранится в git)
-- `documents/` — примеры документов
-- `saved_indexes/` — локальный кэш индексов (не хранится в git)
