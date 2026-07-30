@@ -4,7 +4,6 @@ import re
 import io
 import psycopg2
 import datetime
-from contextlib import contextmanager
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings, StorageContext
 from llama_index.llms.anthropic import Anthropic
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
@@ -12,6 +11,7 @@ from llama_index.readers.file import PDFReader
 from llama_index.vector_stores.supabase import SupabaseVectorStore
 from dotenv import load_dotenv
 from generate_act_final import generate_act as generate_act_docx
+from db import SUPABASE_CONNECTION, get_db_connection
 
 load_dotenv()
 
@@ -90,23 +90,6 @@ st.title("Помощник инженера ПТО")
 
 UPLOAD_DIR = "uploaded_docs"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-SUPABASE_CONNECTION = os.environ["SUPABASE_CONNECTION"]
-
-
-@contextmanager
-def get_db_connection():
-    conn = psycopg2.connect(SUPABASE_CONNECTION)
-    try:
-        cur = conn.cursor()
-        try:
-            yield cur
-            conn.commit()
-        finally:
-            cur.close()
-    finally:
-        conn.close()
-
 
 def get_vector_store():
     return SupabaseVectorStore(
