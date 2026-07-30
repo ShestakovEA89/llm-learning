@@ -4,6 +4,7 @@ import re
 import io
 import psycopg2
 import datetime
+from contextlib import contextmanager
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings, StorageContext
 from llama_index.llms.anthropic import Anthropic
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
@@ -93,6 +94,20 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 SUPABASE_CONNECTION = os.environ["SUPABASE_CONNECTION"]
 
 
+@contextmanager
+def get_db_connection():
+    conn = psycopg2.connect(SUPABASE_CONNECTION)
+    try:
+        cur = conn.cursor()
+        try:
+            yield cur
+            conn.commit()
+        finally:
+            cur.close()
+    finally:
+        conn.close()
+
+
 def get_vector_store():
     return SupabaseVectorStore(
         postgres_connection_string=SUPABASE_CONNECTION,
@@ -104,339 +119,254 @@ def get_vector_store():
 @st.cache_data(ttl=60)
 def get_document_list():
     try:
-        conn = psycopg2.connect(SUPABASE_CONNECTION)
-        cur = conn.cursor()
-        cur.execute("SELECT DISTINCT metadata->>'file_name' FROM vecs.pto_documents;")
-        docs = [row[0] for row in cur.fetchall() if row[0]]
-        cur.close()
-        conn.close()
-        return docs
+        with get_db_connection() as cur:
+            cur.execute("SELECT DISTINCT metadata->>'file_name' FROM vecs.pto_documents;")
+            return [row[0] for row in cur.fetchall() if row[0]]
     except Exception:
         return []
 
 
 @st.cache_data(ttl=60)
 def get_objects():
-    conn = psycopg2.connect(SUPABASE_CONNECTION)
-    cur = conn.cursor()
-    cur.execute("SELECT id, name, address FROM objects ORDER BY name;")
-    objects = cur.fetchall()
-    cur.close()
-    conn.close()
-    return objects
+    with get_db_connection() as cur:
+        cur.execute("SELECT id, name, address FROM objects ORDER BY name;")
+        return cur.fetchall()
 
 
 @st.cache_data(ttl=60)
 def get_object_org_links(object_id):
-    conn = psycopg2.connect(SUPABASE_CONNECTION)
-    cur = conn.cursor()
-    cur.execute(
-        "SELECT developer_org_id, contractor_org_id FROM objects WHERE id = %s;",
-        (object_id,),
-    )
-    row = cur.fetchone()
-    cur.close()
-    conn.close()
-    return row if row else (None, None)
+    with get_db_connection() as cur:
+        cur.execute(
+            "SELECT developer_org_id, contractor_org_id FROM objects WHERE id = %s;",
+            (object_id,),
+        )
+        row = cur.fetchone()
+        return row if row else (None, None)
 
 
 @st.cache_data(ttl=60)
 def get_organizations(role):
-    conn = psycopg2.connect(SUPABASE_CONNECTION)
-    cur = conn.cursor()
-    cur.execute("SELECT id, name FROM organizations WHERE role = %s ORDER BY name;", (role,))
-    orgs = cur.fetchall()
-    cur.close()
-    conn.close()
-    return orgs
+    with get_db_connection() as cur:
+        cur.execute("SELECT id, name FROM organizations WHERE role = %s ORDER BY name;", (role,))
+        return cur.fetchall()
 
 
 def create_object(name, address):
-    conn = psycopg2.connect(SUPABASE_CONNECTION)
-    cur = conn.cursor()
-    cur.execute(
-        """
-        INSERT INTO objects (name, address)
-        VALUES (%s, %s)
-        RETURNING id;
-        """,
-        (name, address),
-    )
-    new_id = cur.fetchone()[0]
-    conn.commit()
-    cur.close()
-    conn.close()
-    return new_id
+    with get_db_connection() as cur:
+        cur.execute(
+            """
+            INSERT INTO objects (name, address)
+            VALUES (%s, %s)
+            RETURNING id;
+            """,
+            (name, address),
+        )
+        return cur.fetchone()[0]
 
 
 def update_object_org_links(object_id, developer_org_id, contractor_org_id):
-    conn = psycopg2.connect(SUPABASE_CONNECTION)
-    cur = conn.cursor()
-    cur.execute(
-        """
-        UPDATE objects SET developer_org_id = %s, contractor_org_id = %s
-        WHERE id = %s;
-        """,
-        (developer_org_id, contractor_org_id, object_id),
-    )
-    conn.commit()
-    cur.close()
-    conn.close()
+    with get_db_connection() as cur:
+        cur.execute(
+            """
+            UPDATE objects SET developer_org_id = %s, contractor_org_id = %s
+            WHERE id = %s;
+            """,
+            (developer_org_id, contractor_org_id, object_id),
+        )
 
 
 def create_organization(name, role, inn, ogrn, address, phone, sro_info):
-    conn = psycopg2.connect(SUPABASE_CONNECTION)
-    cur = conn.cursor()
-    cur.execute(
-        """
-        INSERT INTO organizations (name, role, inn, ogrn, address, phone, sro_info)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        RETURNING id;
-        """,
-        (name, role, inn, ogrn, address, phone, sro_info or None),
-    )
-    new_id = cur.fetchone()[0]
-    conn.commit()
-    cur.close()
-    conn.close()
-    return new_id
+    with get_db_connection() as cur:
+        cur.execute(
+            """
+            INSERT INTO organizations (name, role, inn, ogrn, address, phone, sro_info)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            RETURNING id;
+            """,
+            (name, role, inn, ogrn, address, phone, sro_info or None),
+        )
+        return cur.fetchone()[0]
 
 
 @st.cache_data(ttl=60)
 def get_work_journal_entries(object_id):
-    conn = psycopg2.connect(SUPABASE_CONNECTION)
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT work_date, location, work_type, description
-        FROM work_journal
-        WHERE object_id = %s
-        ORDER BY work_date DESC
-        LIMIT 20;
-        """,
-        (object_id,),
-    )
-    entries = cur.fetchall()
-    cur.close()
-    conn.close()
-    return entries
+    with get_db_connection() as cur:
+        cur.execute(
+            """
+            SELECT work_date, location, work_type, description
+            FROM work_journal
+            WHERE object_id = %s
+            ORDER BY work_date DESC
+            LIMIT 20;
+            """,
+            (object_id,),
+        )
+        return cur.fetchall()
 
 
 @st.cache_data(ttl=60)
 def get_work_journal_entries_for_period(object_id, date_start, date_end):
-    conn = psycopg2.connect(SUPABASE_CONNECTION)
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT work_date, location, work_type, description
-        FROM work_journal
-        WHERE object_id = %s AND work_date BETWEEN %s AND %s
-        ORDER BY work_date ASC;
-        """,
-        (object_id, date_start, date_end),
-    )
-    entries = cur.fetchall()
-    cur.close()
-    conn.close()
-    return entries
+    with get_db_connection() as cur:
+        cur.execute(
+            """
+            SELECT work_date, location, work_type, description
+            FROM work_journal
+            WHERE object_id = %s AND work_date BETWEEN %s AND %s
+            ORDER BY work_date ASC;
+            """,
+            (object_id, date_start, date_end),
+        )
+        return cur.fetchall()
 
 
 def create_work_journal_entry(object_id, work_date, location, work_type, description):
-    conn = psycopg2.connect(SUPABASE_CONNECTION)
-    cur = conn.cursor()
-    cur.execute(
-        """
-        INSERT INTO work_journal (object_id, work_date, location, work_type, description)
-        VALUES (%s, %s, %s, %s, %s)
-        RETURNING id;
-        """,
-        (object_id, work_date, location, work_type, description),
-    )
-    new_id = cur.fetchone()[0]
-    conn.commit()
-    cur.close()
-    conn.close()
-    return new_id
+    with get_db_connection() as cur:
+        cur.execute(
+            """
+            INSERT INTO work_journal (object_id, work_date, location, work_type, description)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id;
+            """,
+            (object_id, work_date, location, work_type, description),
+        )
+        return cur.fetchone()[0]
 
 
 def create_act(object_id, developer_org_id, contractor_org_id, act_number, date_start, date_end, act_date, work_name, designer_org_id=None, project_docs_ref=None, normative_docs=None, supporting_docs=None):
-    conn = psycopg2.connect(SUPABASE_CONNECTION)
-    cur = conn.cursor()
-    cur.execute(
-        """
-        INSERT INTO acts (object_id, developer_org_id, contractor_org_id, act_number, date_start, date_end, act_date, work_name, designer_org_id, project_docs_ref, normative_docs, supporting_docs)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        RETURNING id;
-        """,
-        (object_id, developer_org_id, contractor_org_id, act_number, date_start, date_end, act_date, work_name, designer_org_id, project_docs_ref, normative_docs, supporting_docs),
-    )
-    new_id = cur.fetchone()[0]
-    conn.commit()
-    cur.close()
-    conn.close()
-    return new_id
+    with get_db_connection() as cur:
+        cur.execute(
+            """
+            INSERT INTO acts (object_id, developer_org_id, contractor_org_id, act_number, date_start, date_end, act_date, work_name, designer_org_id, project_docs_ref, normative_docs, supporting_docs)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id;
+            """,
+            (object_id, developer_org_id, contractor_org_id, act_number, date_start, date_end, act_date, work_name, designer_org_id, project_docs_ref, normative_docs, supporting_docs),
+        )
+        return cur.fetchone()[0]
 
 
 def create_act_signatory(act_id, person_id, role):
-    conn = psycopg2.connect(SUPABASE_CONNECTION)
-    cur = conn.cursor()
-    cur.execute(
-        """
-        INSERT INTO act_signatories (act_id, person_id, role)
-        VALUES (%s, %s, %s);
-        """,
-        (act_id, person_id, role),
-    )
-    conn.commit()
-    cur.close()
-    conn.close()
+    with get_db_connection() as cur:
+        cur.execute(
+            """
+            INSERT INTO act_signatories (act_id, person_id, role)
+            VALUES (%s, %s, %s);
+            """,
+            (act_id, person_id, role),
+        )
 
 
 def create_material(act_id, material_name, certificate_number, valid_from, valid_to):
-    conn = psycopg2.connect(SUPABASE_CONNECTION)
-    cur = conn.cursor()
-    cur.execute(
-        """
-        INSERT INTO materials (act_id, material_name, certificate_number, certificate_valid_from, certificate_valid_to)
-        VALUES (%s, %s, %s, %s, %s)
-        RETURNING id;
-        """,
-        (act_id, material_name, certificate_number, valid_from, valid_to),
-    )
-    new_id = cur.fetchone()[0]
-    conn.commit()
-    cur.close()
-    conn.close()
-    return new_id
+    with get_db_connection() as cur:
+        cur.execute(
+            """
+            INSERT INTO materials (act_id, material_name, certificate_number, certificate_valid_from, certificate_valid_to)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id;
+            """,
+            (act_id, material_name, certificate_number, valid_from, valid_to),
+        )
+        return cur.fetchone()[0]
 
 
 @st.cache_data(ttl=60)
 def get_acts_for_object(object_id):
-    conn = psycopg2.connect(SUPABASE_CONNECTION)
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT id, act_number, act_date, work_name
-        FROM acts
-        WHERE object_id = %s
-        ORDER BY act_date DESC, id DESC;
-        """,
-        (object_id,),
-    )
-    acts = cur.fetchall()
-    cur.close()
-    conn.close()
-    return acts
+    with get_db_connection() as cur:
+        cur.execute(
+            """
+            SELECT id, act_number, act_date, work_name
+            FROM acts
+            WHERE object_id = %s
+            ORDER BY act_date DESC, id DESC;
+            """,
+            (object_id,),
+        )
+        return cur.fetchall()
 
 
 @st.cache_data(ttl=60)
 def get_materials_for_act(act_id):
-    conn = psycopg2.connect(SUPABASE_CONNECTION)
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT id, material_name, certificate_number, certificate_valid_from, certificate_valid_to
-        FROM materials
-        WHERE act_id = %s
-        ORDER BY id;
-        """,
-        (act_id,),
-    )
-    materials = cur.fetchall()
-    cur.close()
-    conn.close()
-    return materials
+    with get_db_connection() as cur:
+        cur.execute(
+            """
+            SELECT id, material_name, certificate_number, certificate_valid_from, certificate_valid_to
+            FROM materials
+            WHERE act_id = %s
+            ORDER BY id;
+            """,
+            (act_id,),
+        )
+        return cur.fetchall()
 
 
 def create_commission_act(object_id, act_type, act_date, city, findings_text):
-    conn = psycopg2.connect(SUPABASE_CONNECTION)
-    cur = conn.cursor()
-    cur.execute(
-        """
-        INSERT INTO commission_acts (object_id, act_type, act_date, city, findings_text)
-        VALUES (%s, %s, %s, %s, %s)
-        RETURNING id;
-        """,
-        (object_id, act_type, act_date, city, findings_text or None),
-    )
-    new_id = cur.fetchone()[0]
-    conn.commit()
-    cur.close()
-    conn.close()
-    return new_id
+    with get_db_connection() as cur:
+        cur.execute(
+            """
+            INSERT INTO commission_acts (object_id, act_type, act_date, city, findings_text)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id;
+            """,
+            (object_id, act_type, act_date, city, findings_text or None),
+        )
+        return cur.fetchone()[0]
 
 
 def create_commission_act_signatory(commission_act_id, person_id, role):
-    conn = psycopg2.connect(SUPABASE_CONNECTION)
-    cur = conn.cursor()
-    cur.execute(
-        """
-        INSERT INTO commission_act_signatories (commission_act_id, person_id, role)
-        VALUES (%s, %s, %s);
-        """,
-        (commission_act_id, person_id, role),
-    )
-    conn.commit()
-    cur.close()
-    conn.close()
+    with get_db_connection() as cur:
+        cur.execute(
+            """
+            INSERT INTO commission_act_signatories (commission_act_id, person_id, role)
+            VALUES (%s, %s, %s);
+            """,
+            (commission_act_id, person_id, role),
+        )
 
 
 @st.cache_data(ttl=60)
 def get_commission_acts_for_object(object_id):
-    conn = psycopg2.connect(SUPABASE_CONNECTION)
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT id, act_type, act_date, city, findings_text, created_at
-        FROM commission_acts
-        WHERE object_id = %s
-        ORDER BY act_type, act_date DESC;
-        """,
-        (object_id,),
-    )
-    acts = cur.fetchall()
-    cur.close()
-    conn.close()
-    return acts
+    with get_db_connection() as cur:
+        cur.execute(
+            """
+            SELECT id, act_type, act_date, city, findings_text, created_at
+            FROM commission_acts
+            WHERE object_id = %s
+            ORDER BY act_type, act_date DESC;
+            """,
+            (object_id,),
+        )
+        return cur.fetchall()
 
 
 @st.cache_data(ttl=60)
 def get_commission_act_signatories(commission_act_id):
-    conn = psycopg2.connect(SUPABASE_CONNECTION)
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT cas.role, rp.full_name, rp.position
-        FROM commission_act_signatories cas
-        JOIN responsible_persons rp ON rp.id = cas.person_id
-        WHERE cas.commission_act_id = %s
-        ORDER BY cas.id;
-        """,
-        (commission_act_id,),
-    )
-    signatories = cur.fetchall()
-    cur.close()
-    conn.close()
-    return signatories
+    with get_db_connection() as cur:
+        cur.execute(
+            """
+            SELECT cas.role, rp.full_name, rp.position
+            FROM commission_act_signatories cas
+            JOIN responsible_persons rp ON rp.id = cas.person_id
+            WHERE cas.commission_act_id = %s
+            ORDER BY cas.id;
+            """,
+            (commission_act_id,),
+        )
+        return cur.fetchall()
 
 
 @st.cache_data(ttl=60)
 def get_registries_for_object(object_id):
-    conn = psycopg2.connect(SUPABASE_CONNECTION)
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT id, work_section_name, project_marks
-        FROM registries
-        WHERE object_id = %s
-        ORDER BY id;
-        """,
-        (object_id,),
-    )
-    registries = cur.fetchall()
-    cur.close()
-    conn.close()
-    return registries
+    with get_db_connection() as cur:
+        cur.execute(
+            """
+            SELECT id, work_section_name, project_marks
+            FROM registries
+            WHERE object_id = %s
+            ORDER BY id;
+            """,
+            (object_id,),
+        )
+        return cur.fetchall()
 
 
 def _natural_sort_key(seq_number):
@@ -446,72 +376,57 @@ def _natural_sort_key(seq_number):
 
 @st.cache_data(ttl=60)
 def get_registry_documents(registry_id):
-    conn = psycopg2.connect(SUPABASE_CONNECTION)
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT id, seq_number, is_category_header, document_name, document_number_date,
-               issuing_org, page_count, note
-        FROM registry_documents
-        WHERE registry_id = %s;
-        """,
-        (registry_id,),
-    )
-    documents = cur.fetchall()
-    cur.close()
-    conn.close()
+    with get_db_connection() as cur:
+        cur.execute(
+            """
+            SELECT id, seq_number, is_category_header, document_name, document_number_date,
+                   issuing_org, page_count, note
+            FROM registry_documents
+            WHERE registry_id = %s;
+            """,
+            (registry_id,),
+        )
+        documents = cur.fetchall()
     documents.sort(key=lambda row: _natural_sort_key(row[1]))
     return documents
 
 
 @st.cache_data(ttl=60)
 def get_all_organizations():
-    conn = psycopg2.connect(SUPABASE_CONNECTION)
-    cur = conn.cursor()
-    cur.execute("SELECT id, name, role FROM organizations ORDER BY name;")
-    orgs = cur.fetchall()
-    cur.close()
-    conn.close()
-    return orgs
+    with get_db_connection() as cur:
+        cur.execute("SELECT id, name, role FROM organizations ORDER BY name;")
+        return cur.fetchall()
 
 
 @st.cache_data(ttl=60)
 def get_responsible_persons(organization_ids):
     if not organization_ids:
         return []
-    conn = psycopg2.connect(SUPABASE_CONNECTION)
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT id, full_name, position, order_number, order_date, registry_number, organization_id
-        FROM responsible_persons
-        WHERE organization_id = ANY(%s)
-        ORDER BY full_name;
-        """,
-        (list(organization_ids),),
-    )
-    persons = cur.fetchall()
-    cur.close()
-    conn.close()
-    return persons
+    with get_db_connection() as cur:
+        cur.execute(
+            """
+            SELECT id, full_name, position, order_number, order_date, registry_number, organization_id
+            FROM responsible_persons
+            WHERE organization_id = ANY(%s)
+            ORDER BY full_name;
+            """,
+            (list(organization_ids),),
+        )
+        return cur.fetchall()
 
 
 def create_responsible_person(organization_id, full_name, position, order_number, order_date, registry_number):
-    conn = psycopg2.connect(SUPABASE_CONNECTION)
-    cur = conn.cursor()
-    cur.execute(
-        """
-        INSERT INTO responsible_persons (organization_id, full_name, position, order_number, order_date, registry_number)
-        VALUES (%s, %s, %s, %s, %s, %s)
-        RETURNING id;
-        """,
-        (organization_id, full_name, position, order_number, order_date, registry_number or None),
-    )
-    new_id = cur.fetchone()[0]
-    conn.commit()
-    cur.close()
-    conn.close()
-    return new_id
+    with get_db_connection() as cur:
+        cur.execute(
+            """
+            INSERT INTO responsible_persons (organization_id, full_name, position, order_number, order_date, registry_number)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            RETURNING id;
+            """,
+            (organization_id, full_name, position, order_number, order_date, registry_number or None),
+        )
+        new_id = cur.fetchone()[0]
+        return new_id
 
 
 NEW_OBJECT_OPTION = "➕ Добавить новый объект"
