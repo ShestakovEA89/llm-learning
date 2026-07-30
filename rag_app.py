@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 import re
+import io
 import psycopg2
 import datetime
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings, StorageContext
@@ -9,6 +10,7 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.readers.file import PDFReader
 from llama_index.vector_stores.supabase import SupabaseVectorStore
 from dotenv import load_dotenv
+from generate_act_final import generate_act as generate_act_docx
 
 load_dotenv()
 
@@ -306,6 +308,25 @@ def create_material(act_id, material_name, certificate_number, valid_from, valid
     cur.close()
     conn.close()
     return new_id
+
+
+@st.cache_data(ttl=60)
+def get_acts_for_object(object_id):
+    conn = psycopg2.connect(SUPABASE_CONNECTION)
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT id, act_number, act_date, work_name
+        FROM acts
+        WHERE object_id = %s
+        ORDER BY act_date DESC, id DESC;
+        """,
+        (object_id,),
+    )
+    acts = cur.fetchall()
+    cur.close()
+    conn.close()
+    return acts
 
 
 @st.cache_data(ttl=60)
@@ -1153,6 +1174,23 @@ with tab_new_act:
 
         if "current_act" in st.session_state:
             cur_act = st.session_state.current_act
+
+            st.divider()
+            st.subheader("Скачать акт")
+            cur_act_docx_key = f"act_docx_bytes_{cur_act['act_id']}"
+            if st.button("Подготовить .docx", key=f"prepare_act_{cur_act['act_id']}"):
+                act_docx_buffer = io.BytesIO()
+                generate_act_docx(cur_act["act_id"], act_docx_buffer)
+                st.session_state[cur_act_docx_key] = act_docx_buffer.getvalue()
+            if cur_act_docx_key in st.session_state:
+                st.download_button(
+                    "Скачать акт .docx",
+                    data=st.session_state[cur_act_docx_key],
+                    file_name=f"Акт_{cur_act['act_number']}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    key=f"download_act_{cur_act['act_id']}",
+                )
+
             st.divider()
             st.subheader("Добавить материалы")
             st.caption(f"Материалы для акта №{cur_act['act_number']} (id={cur_act['act_id']}).")
@@ -1202,6 +1240,30 @@ with tab_new_act:
                             from_str = mat_valid_from.strftime("%d.%m.%Y") if mat_valid_from else "—"
                             to_str = mat_valid_to.strftime("%d.%m.%Y") if mat_valid_to else "—"
                             st.write(f"Срок действия: {from_str} — {to_str}")
+
+        st.divider()
+        st.subheader("Ранее созданные акты")
+        object_acts = get_acts_for_object(object_id)
+        if not object_acts:
+            st.info("Для этого объекта пока нет созданных актов.")
+        else:
+            for obj_act_id, obj_act_number, obj_act_date, obj_act_work_name in object_acts:
+                with st.container(border=True):
+                    st.markdown(f"**Акт №{obj_act_number}** от {obj_act_date.strftime('%d.%m.%Y')}")
+                    st.write(obj_act_work_name)
+                    obj_act_docx_key = f"act_docx_bytes_{obj_act_id}"
+                    if st.button("Подготовить .docx", key=f"prepare_act_object_{obj_act_id}"):
+                        obj_act_docx_buffer = io.BytesIO()
+                        generate_act_docx(obj_act_id, obj_act_docx_buffer)
+                        st.session_state[obj_act_docx_key] = obj_act_docx_buffer.getvalue()
+                    if obj_act_docx_key in st.session_state:
+                        st.download_button(
+                            "Скачать акт .docx",
+                            data=st.session_state[obj_act_docx_key],
+                            file_name=f"Акт_{obj_act_number}.docx",
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            key=f"download_act_object_{obj_act_id}",
+                        )
 
 with tab_commission_acts:
     st.subheader("Комиссионные акты")
