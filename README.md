@@ -68,6 +68,7 @@ streamlit run rag_app.py
 - `commission_acts.py` — комиссионные акты и их подписанты (`create_commission_act`, `get_commission_acts_for_object`, `create_commission_act_signatory`, `get_commission_act_signatories`)
 - `registries.py` — реестры исполнительной документации (`get_registries_for_object`, `get_registry_documents`)
 - `documents.py` — список загруженных в базу документов для RAG-чата (`get_document_list`)
+- `cache.py` — кэширующие обёртки (`@st.cache_data`) над читающими функциями из модулей выше; сами модули содержат только чистые функции работы с БД, без зависимости от Streamlit
 - `generate_act_final.py` — генерация .docx актов по шаблону
 - `templates/` — шаблоны документов (.docx)
 - `requirements.txt` — зависимости проекта
