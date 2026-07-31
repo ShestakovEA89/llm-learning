@@ -1,4 +1,3 @@
-import streamlit as st
 from db import get_db_connection
 
 
@@ -26,7 +25,6 @@ def create_commission_act_signatory(commission_act_id, person_id, role):
         )
 
 
-@st.cache_data(ttl=60)
 def get_commission_acts_for_object(object_id):
     with get_db_connection() as cur:
         cur.execute(
@@ -41,7 +39,6 @@ def get_commission_acts_for_object(object_id):
         return cur.fetchall()
 
 
-@st.cache_data(ttl=60)
 def get_commission_act_signatories(commission_act_id):
     with get_db_connection() as cur:
         cur.execute(

@@ -1,15 +1,12 @@
-import streamlit as st
 from db import get_db_connection
 
 
-@st.cache_data(ttl=60)
 def get_objects():
     with get_db_connection() as cur:
         cur.execute("SELECT id, name, address FROM objects ORDER BY name;")
         return cur.fetchall()
 
 
-@st.cache_data(ttl=60)
 def get_object_org_links(object_id):
     with get_db_connection() as cur:
         cur.execute(

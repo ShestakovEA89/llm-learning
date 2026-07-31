@@ -1,8 +1,6 @@
-import streamlit as st
 from db import get_db_connection
 
 
-@st.cache_data(ttl=60)
 def get_organizations(role):
     with get_db_connection() as cur:
         cur.execute("SELECT id, name FROM organizations WHERE role = %s ORDER BY name;", (role,))
@@ -22,7 +20,6 @@ def create_organization(name, role, inn, ogrn, address, phone, sro_info):
         return cur.fetchone()[0]
 
 
-@st.cache_data(ttl=60)
 def get_all_organizations():
     with get_db_connection() as cur:
         cur.execute("SELECT id, name, role FROM organizations ORDER BY name;")

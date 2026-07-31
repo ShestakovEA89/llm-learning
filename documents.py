@@ -1,8 +1,6 @@
-import streamlit as st
 from db import get_db_connection
 
 
-@st.cache_data(ttl=60)
 def get_document_list():
     try:
         with get_db_connection() as cur:

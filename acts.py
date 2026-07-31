@@ -1,4 +1,3 @@
-import streamlit as st
 from db import get_db_connection
 
 
@@ -39,7 +38,6 @@ def create_material(act_id, material_name, certificate_number, valid_from, valid
         return cur.fetchone()[0]
 
 
-@st.cache_data(ttl=60)
 def get_acts_for_object(object_id):
     with get_db_connection() as cur:
         cur.execute(
@@ -54,7 +52,6 @@ def get_acts_for_object(object_id):
         return cur.fetchall()
 
 
-@st.cache_data(ttl=60)
 def get_materials_for_act(act_id):
     with get_db_connection() as cur:
         cur.execute(

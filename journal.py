@@ -1,8 +1,6 @@
-import streamlit as st
 from db import get_db_connection
 
 
-@st.cache_data(ttl=60)
 def get_work_journal_entries(object_id):
     with get_db_connection() as cur:
         cur.execute(
@@ -18,7 +16,6 @@ def get_work_journal_entries(object_id):
         return cur.fetchall()
 
 
-@st.cache_data(ttl=60)
 def get_work_journal_entries_for_period(object_id, date_start, date_end):
     with get_db_connection() as cur:
         cur.execute(

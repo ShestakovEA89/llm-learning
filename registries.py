@@ -1,11 +1,9 @@
 import json
 import re
 import anthropic
-import streamlit as st
 from db import get_db_connection
 
 
-@st.cache_data(ttl=60)
 def get_registries_for_object(object_id):
     with get_db_connection() as cur:
         cur.execute(
@@ -33,7 +31,6 @@ def create_registry(object_id, work_section_name, project_marks=None):
         return cur.fetchone()[0]
 
 
-@st.cache_data(ttl=60)
 def get_registry_documents(registry_id):
     with get_db_connection() as cur:
         cur.execute(

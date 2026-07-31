@@ -1,8 +1,6 @@
-import streamlit as st
 from db import get_db_connection
 
 
-@st.cache_data(ttl=60)
 def get_responsible_persons(organization_ids):
     if not organization_ids:
         return []
