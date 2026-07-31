@@ -94,7 +94,7 @@ st.markdown(
 
 @st.cache_resource
 def configure_llm_settings():
-    Settings.llm = Anthropic(model="claude-sonnet-4-6")
+    Settings.llm = Anthropic(model="claude-sonnet-5")
     Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
 
 
