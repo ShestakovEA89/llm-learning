@@ -2,6 +2,7 @@ import streamlit as st
 import os
 import io
 import datetime
+import traceback
 import anthropic
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings, StorageContext
 from llama_index.llms.anthropic import Anthropic
@@ -270,74 +271,85 @@ with tab_object:
             for err in obj_errors:
                 st.error(err)
         else:
-            if obj_object_choice[0] is None:
-                object_name_raw = new_obj_object["name"].strip()
-                object_address_raw = new_obj_object["address"].strip()
-                object_id = create_object(
-                    name=object_name_raw,
-                    address=object_address_raw,
+            db_save_ok = True
+            try:
+                if obj_object_choice[0] is None:
+                    object_name_raw = new_obj_object["name"].strip()
+                    object_address_raw = new_obj_object["address"].strip()
+                    object_id = create_object(
+                        name=object_name_raw,
+                        address=object_address_raw,
+                    )
+                    object_name = f"{object_name_raw}, {object_address_raw}"
+                    get_objects.clear()
+                else:
+                    object_id = obj_object_choice[0]
+                    object_name = f"{obj_object_choice[1]}, {obj_object_choice[2]}"
+
+                if obj_developer_choice[0] is None:
+                    developer_id = create_organization(
+                        name=new_obj_developer["name"].strip(),
+                        role="застройщик",
+                        inn=new_obj_developer["inn"].strip(),
+                        ogrn=new_obj_developer["ogrn"].strip(),
+                        address=new_obj_developer["address"].strip(),
+                        phone=new_obj_developer["phone"].strip(),
+                        sro_info=new_obj_developer["sro_info"].strip(),
+                    )
+                    developer_name = new_obj_developer["name"].strip()
+                    get_organizations.clear()
+                else:
+                    developer_id = obj_developer_choice[0]
+                    developer_name = obj_developer_choice[1]
+
+                if obj_contractor_choice[0] is None:
+                    contractor_id = create_organization(
+                        name=new_obj_contractor["name"].strip(),
+                        role="подрядчик",
+                        inn=new_obj_contractor["inn"].strip(),
+                        ogrn=new_obj_contractor["ogrn"].strip(),
+                        address=new_obj_contractor["address"].strip(),
+                        phone=new_obj_contractor["phone"].strip(),
+                        sro_info=new_obj_contractor["sro_info"].strip(),
+                    )
+                    contractor_name = new_obj_contractor["name"].strip()
+                    get_organizations.clear()
+                else:
+                    contractor_id = obj_contractor_choice[0]
+                    contractor_name = obj_contractor_choice[1]
+
+                update_object_org_links(object_id, developer_id, contractor_id)
+                get_object_org_links.clear()
+            except Exception as db_exc:
+                db_save_ok = False
+                print(f"[DB ERROR] Не удалось сохранить рабочий объект/организации: {db_exc}")
+                traceback.print_exc()
+                st.error(
+                    "Не удалось сохранить рабочий объект. "
+                    "Проверьте соединение с базой данных и попробуйте ещё раз."
                 )
-                object_name = f"{object_name_raw}, {object_address_raw}"
-                get_objects.clear()
-            else:
-                object_id = obj_object_choice[0]
-                object_name = f"{obj_object_choice[1]}, {obj_object_choice[2]}"
 
-            if obj_developer_choice[0] is None:
-                developer_id = create_organization(
-                    name=new_obj_developer["name"].strip(),
-                    role="застройщик",
-                    inn=new_obj_developer["inn"].strip(),
-                    ogrn=new_obj_developer["ogrn"].strip(),
-                    address=new_obj_developer["address"].strip(),
-                    phone=new_obj_developer["phone"].strip(),
-                    sro_info=new_obj_developer["sro_info"].strip(),
-                )
-                developer_name = new_obj_developer["name"].strip()
-                get_organizations.clear()
-            else:
-                developer_id = obj_developer_choice[0]
-                developer_name = obj_developer_choice[1]
+            if db_save_ok:
+                st.session_state.current_object = {
+                    "object_id": object_id,
+                    "object_name": object_name,
+                    "developer_id": developer_id,
+                    "developer_name": developer_name,
+                    "contractor_id": contractor_id,
+                    "contractor_name": contractor_name,
+                }
 
-            if obj_contractor_choice[0] is None:
-                contractor_id = create_organization(
-                    name=new_obj_contractor["name"].strip(),
-                    role="подрядчик",
-                    inn=new_obj_contractor["inn"].strip(),
-                    ogrn=new_obj_contractor["ogrn"].strip(),
-                    address=new_obj_contractor["address"].strip(),
-                    phone=new_obj_contractor["phone"].strip(),
-                    sro_info=new_obj_contractor["sro_info"].strip(),
-                )
-                contractor_name = new_obj_contractor["name"].strip()
-                get_organizations.clear()
-            else:
-                contractor_id = obj_contractor_choice[0]
-                contractor_name = obj_contractor_choice[1]
+                for k in (
+                    "obj_tab_new_object_name", "obj_tab_new_object_address",
+                    "obj_tab_new_developer_name", "obj_tab_new_developer_inn", "obj_tab_new_developer_ogrn",
+                    "obj_tab_new_developer_address", "obj_tab_new_developer_phone", "obj_tab_new_developer_sro",
+                    "obj_tab_new_contractor_name", "obj_tab_new_contractor_inn", "obj_tab_new_contractor_ogrn",
+                    "obj_tab_new_contractor_address", "obj_tab_new_contractor_phone", "obj_tab_new_contractor_sro",
+                ):
+                    st.session_state.pop(k, None)
 
-            update_object_org_links(object_id, developer_id, contractor_id)
-            get_object_org_links.clear()
-
-            st.session_state.current_object = {
-                "object_id": object_id,
-                "object_name": object_name,
-                "developer_id": developer_id,
-                "developer_name": developer_name,
-                "contractor_id": contractor_id,
-                "contractor_name": contractor_name,
-            }
-
-            for k in (
-                "obj_tab_new_object_name", "obj_tab_new_object_address",
-                "obj_tab_new_developer_name", "obj_tab_new_developer_inn", "obj_tab_new_developer_ogrn",
-                "obj_tab_new_developer_address", "obj_tab_new_developer_phone", "obj_tab_new_developer_sro",
-                "obj_tab_new_contractor_name", "obj_tab_new_contractor_inn", "obj_tab_new_contractor_ogrn",
-                "obj_tab_new_contractor_address", "obj_tab_new_contractor_phone", "obj_tab_new_contractor_sro",
-            ):
-                st.session_state.pop(k, None)
-
-            st.success(f"Рабочий объект сохранён: {object_name}")
-            st.rerun()
+                st.success(f"Рабочий объект сохранён: {object_name}")
+                st.rerun()
 
     if "current_object" in st.session_state:
         cur_obj = st.session_state.current_object
@@ -362,16 +374,28 @@ with tab_object:
                 if not new_registry_section_name.strip():
                     st.error("Укажите название раздела.")
                 else:
-                    create_registry(
-                        cur_obj["object_id"],
-                        new_registry_section_name.strip(),
-                        new_registry_project_marks.strip() or None,
-                    )
-                    get_registries_for_object.clear()
-                    st.session_state.pop("new_registry_section_name", None)
-                    st.session_state.pop("new_registry_project_marks", None)
-                    st.success(f"Реестр создан: {new_registry_section_name.strip()}")
-                    st.rerun()
+                    registry_save_ok = True
+                    try:
+                        create_registry(
+                            cur_obj["object_id"],
+                            new_registry_section_name.strip(),
+                            new_registry_project_marks.strip() or None,
+                        )
+                    except Exception as db_exc:
+                        registry_save_ok = False
+                        print(f"[DB ERROR] Не удалось сохранить реестр «{new_registry_section_name.strip()}»: {db_exc}")
+                        traceback.print_exc()
+                        st.error(
+                            "Не удалось сохранить реестр. "
+                            "Проверьте соединение с базой данных и попробуйте ещё раз."
+                        )
+
+                    if registry_save_ok:
+                        get_registries_for_object.clear()
+                        st.session_state.pop("new_registry_section_name", None)
+                        st.session_state.pop("new_registry_project_marks", None)
+                        st.success(f"Реестр создан: {new_registry_section_name.strip()}")
+                        st.rerun()
 
         obj_registries = get_registries_for_object(cur_obj["object_id"])
         if not obj_registries:
@@ -446,13 +470,26 @@ with tab_object:
                     )
 
                     if st.button("Сохранить все строки", key="registry_save_parsed_btn"):
-                        create_registry_documents_bulk(registry_choice[0], parsed_preview_rows)
-                        get_registry_documents.clear()
-                        st.session_state.pop("registry_parsed_rows", None)
-                        st.session_state.pop("registry_parsed_for_id", None)
-                        st.session_state.pop("registry_raw_text", None)
-                        st.success(f"Сохранено строк: {len(parsed_preview_rows)}")
-                        st.rerun()
+                        registry_bulk_save_ok = True
+                        try:
+                            create_registry_documents_bulk(registry_choice[0], parsed_preview_rows)
+                        except Exception as db_exc:
+                            registry_bulk_save_ok = False
+                            print(f"[DB ERROR] Не удалось сохранить строки реестра: {db_exc}")
+                            traceback.print_exc()
+                            st.error(
+                                "Не удалось сохранить строки реестра. "
+                                "Разобранные данные не потеряны — проверьте соединение с базой данных "
+                                "и попробуйте сохранить ещё раз."
+                            )
+
+                        if registry_bulk_save_ok:
+                            get_registry_documents.clear()
+                            st.session_state.pop("registry_parsed_rows", None)
+                            st.session_state.pop("registry_parsed_for_id", None)
+                            st.session_state.pop("registry_raw_text", None)
+                            st.success(f"Сохранено строк: {len(parsed_preview_rows)}")
+                            st.rerun()
 
         st.divider()
         st.subheader("Представители организаций")
@@ -510,19 +547,31 @@ with tab_object:
                 for err in rep_errors:
                     st.error(err)
             else:
-                create_responsible_person(
-                    organization_id=rep_organization_id,
-                    full_name=rep_full_name.strip(),
-                    position=rep_position.strip(),
-                    order_number=rep_order_number.strip(),
-                    order_date=rep_order_date,
-                    registry_number=rep_registry_number.strip(),
-                )
-                get_responsible_persons.clear()
-                for k in ("rep_full_name", "rep_position", "rep_order_number", "rep_registry_number"):
-                    st.session_state.pop(k, None)
-                st.success(f"Представитель «{rep_full_name.strip()}» добавлен.")
-                st.rerun()
+                rep_save_ok = True
+                try:
+                    create_responsible_person(
+                        organization_id=rep_organization_id,
+                        full_name=rep_full_name.strip(),
+                        position=rep_position.strip(),
+                        order_number=rep_order_number.strip(),
+                        order_date=rep_order_date,
+                        registry_number=rep_registry_number.strip(),
+                    )
+                except Exception as db_exc:
+                    rep_save_ok = False
+                    print(f"[DB ERROR] Не удалось сохранить представителя «{rep_full_name.strip()}»: {db_exc}")
+                    traceback.print_exc()
+                    st.error(
+                        "Не удалось сохранить представителя. "
+                        "Проверьте соединение с базой данных и попробуйте ещё раз."
+                    )
+
+                if rep_save_ok:
+                    get_responsible_persons.clear()
+                    for k in ("rep_full_name", "rep_position", "rep_order_number", "rep_registry_number"):
+                        st.session_state.pop(k, None)
+                    st.success(f"Представитель «{rep_full_name.strip()}» добавлен.")
+                    st.rerun()
 
         st.divider()
         st.markdown("**Уже добавленные представители**")
@@ -811,41 +860,53 @@ with tab_new_act:
                     for err in errors:
                         st.error(err)
                 else:
-                    new_id = create_act(
-                        object_id=object_id,
-                        developer_org_id=developer_org_id,
-                        contractor_org_id=contractor_org_id,
-                        act_number=act_number.strip(),
-                        date_start=date_start,
-                        date_end=date_end,
-                        act_date=date_end,
-                        work_name=work_name.strip(),
-                        designer_org_id=act_designer_org_choice[0],
-                        project_docs_ref=project_docs_ref.strip() or None,
-                        normative_docs=normative_docs.strip() or None,
-                        supporting_docs=supporting_docs.strip() or None,
-                    )
-                    create_act_signatory(
-                        new_id, act_developer_control_person_choice[0], "застройщик, строительный контроль"
-                    )
-                    create_act_signatory(new_id, act_contractor_person_choice[0], "подрядчик")
-                    create_act_signatory(
-                        new_id, act_contractor_control_person_choice[0], "подрядчик, строительный контроль"
-                    )
-                    if act_subcontractor_control_person_choice[0] is not None:
-                        create_act_signatory(
-                            new_id, act_subcontractor_control_person_choice[0], "субподрядчик, строительный контроль"
+                    act_save_ok = True
+                    try:
+                        new_id = create_act(
+                            object_id=object_id,
+                            developer_org_id=developer_org_id,
+                            contractor_org_id=contractor_org_id,
+                            act_number=act_number.strip(),
+                            date_start=date_start,
+                            date_end=date_end,
+                            act_date=date_end,
+                            work_name=work_name.strip(),
+                            designer_org_id=act_designer_org_choice[0],
+                            project_docs_ref=project_docs_ref.strip() or None,
+                            normative_docs=normative_docs.strip() or None,
+                            supporting_docs=supporting_docs.strip() or None,
                         )
-                    if act_designer_control_person_choice[0] is not None:
                         create_act_signatory(
-                            new_id, act_designer_control_person_choice[0], "проектировщик, строительный контроль"
+                            new_id, act_developer_control_person_choice[0], "застройщик, строительный контроль"
                         )
-                    st.session_state.current_act = {
-                        "act_id": new_id,
-                        "act_number": act_number.strip(),
-                    }
-                    st.success(f"Акт №{act_number} сохранён (id={new_id}).")
-                    st.rerun()
+                        create_act_signatory(new_id, act_contractor_person_choice[0], "подрядчик")
+                        create_act_signatory(
+                            new_id, act_contractor_control_person_choice[0], "подрядчик, строительный контроль"
+                        )
+                        if act_subcontractor_control_person_choice[0] is not None:
+                            create_act_signatory(
+                                new_id, act_subcontractor_control_person_choice[0], "субподрядчик, строительный контроль"
+                            )
+                        if act_designer_control_person_choice[0] is not None:
+                            create_act_signatory(
+                                new_id, act_designer_control_person_choice[0], "проектировщик, строительный контроль"
+                            )
+                    except Exception as db_exc:
+                        act_save_ok = False
+                        print(f"[DB ERROR] Не удалось сохранить акт №{act_number.strip()}: {db_exc}")
+                        traceback.print_exc()
+                        st.error(
+                            "Не удалось сохранить акт. "
+                            "Проверьте соединение с базой данных и попробуйте ещё раз."
+                        )
+
+                    if act_save_ok:
+                        st.session_state.current_act = {
+                            "act_id": new_id,
+                            "act_number": act_number.strip(),
+                        }
+                        st.success(f"Акт №{act_number} сохранён (id={new_id}).")
+                        st.rerun()
 
         if "current_act" in st.session_state:
             cur_act = st.session_state.current_act
@@ -889,16 +950,28 @@ with tab_new_act:
                     if not material_name.strip():
                         st.error("Укажите название материала.")
                     else:
-                        create_material(
-                            act_id=cur_act["act_id"],
-                            material_name=material_name.strip(),
-                            certificate_number=certificate_number.strip() or None,
-                            valid_from=certificate_valid_from,
-                            valid_to=certificate_valid_to,
-                        )
-                        get_materials_for_act.clear()
-                        st.success(f"Материал «{material_name.strip()}» добавлен.")
-                        st.rerun()
+                        material_save_ok = True
+                        try:
+                            create_material(
+                                act_id=cur_act["act_id"],
+                                material_name=material_name.strip(),
+                                certificate_number=certificate_number.strip() or None,
+                                valid_from=certificate_valid_from,
+                                valid_to=certificate_valid_to,
+                            )
+                        except Exception as db_exc:
+                            material_save_ok = False
+                            print(f"[DB ERROR] Не удалось сохранить материал «{material_name.strip()}»: {db_exc}")
+                            traceback.print_exc()
+                            st.error(
+                                "Не удалось сохранить материал. "
+                                "Проверьте соединение с базой данных и попробуйте ещё раз."
+                            )
+
+                        if material_save_ok:
+                            get_materials_for_act.clear()
+                            st.success(f"Материал «{material_name.strip()}» добавлен.")
+                            st.rerun()
 
             st.markdown("**Уже добавленные материалы**")
             act_materials = get_materials_for_act(cur_act["act_id"])
@@ -1015,24 +1088,36 @@ with tab_commission_acts:
                             or not ca_new_address.strip() or not ca_new_phone.strip():
                         st.error("Заполните все обязательные поля новой организации.")
                     else:
-                        create_organization(
-                            name=ca_new_name.strip(),
-                            role=ca_new_role,
-                            inn=ca_new_inn.strip(),
-                            ogrn=ca_new_ogrn.strip(),
-                            address=ca_new_address.strip(),
-                            phone=ca_new_phone.strip(),
-                            sro_info="",
-                        )
-                        get_organizations.clear()
-                        get_all_organizations.clear()
-                        for k in (
-                            f"ca_{ca_slug}_new_name", f"ca_{ca_slug}_new_inn", f"ca_{ca_slug}_new_ogrn",
-                            f"ca_{ca_slug}_new_address", f"ca_{ca_slug}_new_phone",
-                        ):
-                            st.session_state.pop(k, None)
-                        st.success(f"Организация «{ca_new_name.strip()}» добавлена.")
-                        st.rerun()
+                        ca_org_save_ok = True
+                        try:
+                            create_organization(
+                                name=ca_new_name.strip(),
+                                role=ca_new_role,
+                                inn=ca_new_inn.strip(),
+                                ogrn=ca_new_ogrn.strip(),
+                                address=ca_new_address.strip(),
+                                phone=ca_new_phone.strip(),
+                                sro_info="",
+                            )
+                        except Exception as db_exc:
+                            ca_org_save_ok = False
+                            print(f"[DB ERROR] Не удалось сохранить организацию «{ca_new_name.strip()}»: {db_exc}")
+                            traceback.print_exc()
+                            st.error(
+                                "Не удалось сохранить организацию. "
+                                "Проверьте соединение с базой данных и попробуйте ещё раз."
+                            )
+
+                        if ca_org_save_ok:
+                            get_organizations.clear()
+                            get_all_organizations.clear()
+                            for k in (
+                                f"ca_{ca_slug}_new_name", f"ca_{ca_slug}_new_inn", f"ca_{ca_slug}_new_ogrn",
+                                f"ca_{ca_slug}_new_address", f"ca_{ca_slug}_new_phone",
+                            ):
+                                st.session_state.pop(k, None)
+                            st.success(f"Организация «{ca_new_name.strip()}» добавлена.")
+                            st.rerun()
                 ca_org_id = None
 
             ca_person_id = None
@@ -1070,23 +1155,35 @@ with tab_commission_acts:
                 for err in ca_errors:
                     st.error(err)
             else:
-                new_ca_id = create_commission_act(
-                    object_id=object_id,
-                    act_type=ca_act_type_choice[0],
-                    act_date=ca_act_date,
-                    city=ca_city.strip(),
-                    findings_text=ca_findings_text.strip() or None,
-                )
-                for ca_slug, ca_role_label in COMMISSION_ROLE_SLOTS:
-                    create_commission_act_signatory(
-                        new_ca_id, ca_role_person_ids[ca_slug], ca_role_label.lower()
+                ca_save_ok = True
+                try:
+                    new_ca_id = create_commission_act(
+                        object_id=object_id,
+                        act_type=ca_act_type_choice[0],
+                        act_date=ca_act_date,
+                        city=ca_city.strip(),
+                        findings_text=ca_findings_text.strip() or None,
                     )
-                get_commission_acts_for_object.clear()
-                get_commission_act_signatories.clear()
-                for k in ("ca_city", "ca_findings_text"):
-                    st.session_state.pop(k, None)
-                st.success(f"Комиссионный акт «{ca_act_type_choice[0]}» сохранён (id={new_ca_id}).")
-                st.rerun()
+                    for ca_slug, ca_role_label in COMMISSION_ROLE_SLOTS:
+                        create_commission_act_signatory(
+                            new_ca_id, ca_role_person_ids[ca_slug], ca_role_label.lower()
+                        )
+                except Exception as db_exc:
+                    ca_save_ok = False
+                    print(f"[DB ERROR] Не удалось сохранить комиссионный акт: {db_exc}")
+                    traceback.print_exc()
+                    st.error(
+                        "Не удалось сохранить комиссионный акт. "
+                        "Проверьте соединение с базой данных и попробуйте ещё раз."
+                    )
+
+                if ca_save_ok:
+                    get_commission_acts_for_object.clear()
+                    get_commission_act_signatories.clear()
+                    for k in ("ca_city", "ca_findings_text"):
+                        st.session_state.pop(k, None)
+                    st.success(f"Комиссионный акт «{ca_act_type_choice[0]}» сохранён (id={new_ca_id}).")
+                    st.rerun()
 
         st.divider()
         st.subheader("Уже созданные комиссионные акты")
@@ -1151,17 +1248,29 @@ with tab_journal:
                     for err in journal_errors:
                         st.error(err)
                 else:
-                    create_work_journal_entry(
-                        object_id=journal_object_id,
-                        work_date=work_date,
-                        location=location.strip(),
-                        work_type=work_type.strip(),
-                        description=description.strip(),
-                    )
-                    st.success("Запись добавлена в журнал работ.")
-                    get_work_journal_entries.clear()
-                    get_work_journal_entries_for_period.clear()
-                    st.rerun()
+                    journal_save_ok = True
+                    try:
+                        create_work_journal_entry(
+                            object_id=journal_object_id,
+                            work_date=work_date,
+                            location=location.strip(),
+                            work_type=work_type.strip(),
+                            description=description.strip(),
+                        )
+                    except Exception as db_exc:
+                        journal_save_ok = False
+                        print(f"[DB ERROR] Не удалось сохранить запись журнала работ: {db_exc}")
+                        traceback.print_exc()
+                        st.error(
+                            "Не удалось сохранить запись в журнале работ. "
+                            "Проверьте соединение с базой данных и попробуйте ещё раз."
+                        )
+
+                    if journal_save_ok:
+                        st.success("Запись добавлена в журнал работ.")
+                        get_work_journal_entries.clear()
+                        get_work_journal_entries_for_period.clear()
+                        st.rerun()
 
         st.divider()
         st.markdown(f"**Последние записи по объекту «{journal_object_name}»**")
