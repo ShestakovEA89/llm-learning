@@ -32,7 +32,7 @@ OTHER_ORG_OPTION = "— Другая организация из базы —"
 
 
 def render():
-    st.subheader("Рабочий объект")
+    st.subheader("Объект")
     st.caption("Выберите объект, застройщика и подрядчика — они будут использоваться в журнале работ и актах.")
 
     obj_objects = get_objects()
@@ -216,7 +216,7 @@ def render():
                 ):
                     st.session_state.pop(k, None)
 
-                st.success(f"Рабочий объект сохранён: {object_name}")
+                st.success(f"Объект сохранён: {object_name}")
                 st.rerun()
 
     if "current_object" in st.session_state:
