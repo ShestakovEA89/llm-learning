@@ -22,7 +22,7 @@ COMMISSION_ACT_TYPES = [
     "комплексное испытание",
     "приёмка в эксплуатацию",
 ]
-ORG_ROLE_OPTIONS = ["застройщик", "подрядчик", "проектировщик", "генподрядчик"]
+ORG_ROLE_OPTIONS = ["застройщик", "подрядчик", "проектировщик", "генподрядчик", "строительный контроль"]
 COMMISSION_ROLE_SLOTS = [
     ("tech_customer", "Технический заказчик"),
     ("gen_contractor", "Генеральный подрядчик"),
@@ -98,8 +98,8 @@ def render():
                     ca_new_ogrn = st.text_input("ОГРН", key=f"ca_{ca_slug}_new_ogrn")
                 ca_new_address = st.text_input("Адрес", key=f"ca_{ca_slug}_new_address")
                 ca_new_phone = st.text_input("Телефон", key=f"ca_{ca_slug}_new_phone")
-                ca_new_role = st.selectbox(
-                    "Роль организации",
+                ca_new_roles = st.multiselect(
+                    "Роли организации",
                     options=ORG_ROLE_OPTIONS,
                     key=f"ca_{ca_slug}_new_role",
                 )
@@ -108,12 +108,14 @@ def render():
                     if not ca_new_name.strip() or not ca_new_inn.strip() or not ca_new_ogrn.strip() \
                             or not ca_new_address.strip() or not ca_new_phone.strip():
                         st.error("Заполните все обязательные поля новой организации.")
+                    elif not ca_new_roles:
+                        st.error("Выберите хотя бы одну роль организации.")
                     else:
                         ca_org_save_ok = True
                         try:
                             create_organization(
                                 name=ca_new_name.strip(),
-                                role=ca_new_role,
+                                roles=ca_new_roles,
                                 inn=ca_new_inn.strip(),
                                 ogrn=ca_new_ogrn.strip(),
                                 address=ca_new_address.strip(),

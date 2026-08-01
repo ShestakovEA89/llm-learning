@@ -157,7 +157,7 @@ def render():
                 if obj_developer_choice[0] is None:
                     developer_id = create_organization(
                         name=new_obj_developer["name"].strip(),
-                        role="застройщик",
+                        roles=["застройщик"],
                         inn=new_obj_developer["inn"].strip(),
                         ogrn=new_obj_developer["ogrn"].strip(),
                         address=new_obj_developer["address"].strip(),
@@ -173,7 +173,7 @@ def render():
                 if obj_contractor_choice[0] is None:
                     contractor_id = create_organization(
                         name=new_obj_contractor["name"].strip(),
-                        role="подрядчик",
+                        roles=["подрядчик"],
                         inn=new_obj_contractor["inn"].strip(),
                         ogrn=new_obj_contractor["ogrn"].strip(),
                         address=new_obj_contractor["address"].strip(),
