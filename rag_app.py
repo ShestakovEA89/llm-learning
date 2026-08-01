@@ -1,6 +1,6 @@
 import streamlit as st
 from dotenv import load_dotenv
-from shared import TAB_OBJECT_LABEL
+from shared import TAB_OBJECT_LABEL, render_session_cleanup_panel
 import tab_journal
 import tab_object
 import tab_new_act
@@ -86,6 +86,8 @@ st.markdown(
 
 
 st.title("Помощник инженера ПТО")
+
+render_session_cleanup_panel()
 
 TAB_JOURNAL_LABEL = "📓 Журнал работ"
 TAB_NEW_ACT_LABEL = "📝 Новый акт скрытых работ"

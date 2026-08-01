@@ -13,7 +13,7 @@ from cache import (
     get_materials_for_act,
     get_work_journal_entries_for_period,
 )
-from shared import go_to_object_tab
+from shared import go_to_object_tab, track_created
 
 
 def render():
@@ -203,20 +203,26 @@ def render():
                             normative_docs=normative_docs.strip() or None,
                             supporting_docs=supporting_docs.strip() or None,
                         )
-                        create_act_signatory(
-                            new_id, act_developer_control_person_choice[0], "застройщик, строительный контроль"
+                        track_created("acts", {"id": new_id})
+
+                        def _add_act_signatory(person_id, role):
+                            create_act_signatory(new_id, person_id, role)
+                            track_created("act_signatories", {"act_id": new_id, "person_id": person_id, "role": role})
+
+                        _add_act_signatory(
+                            act_developer_control_person_choice[0], "застройщик, строительный контроль"
                         )
-                        create_act_signatory(new_id, act_contractor_person_choice[0], "подрядчик")
-                        create_act_signatory(
-                            new_id, act_contractor_control_person_choice[0], "подрядчик, строительный контроль"
+                        _add_act_signatory(act_contractor_person_choice[0], "подрядчик")
+                        _add_act_signatory(
+                            act_contractor_control_person_choice[0], "подрядчик, строительный контроль"
                         )
                         if act_subcontractor_control_person_choice[0] is not None:
-                            create_act_signatory(
-                                new_id, act_subcontractor_control_person_choice[0], "субподрядчик, строительный контроль"
+                            _add_act_signatory(
+                                act_subcontractor_control_person_choice[0], "субподрядчик, строительный контроль"
                             )
                         if act_designer_control_person_choice[0] is not None:
-                            create_act_signatory(
-                                new_id, act_designer_control_person_choice[0], "проектировщик, строительный контроль"
+                            _add_act_signatory(
+                                act_designer_control_person_choice[0], "проектировщик, строительный контроль"
                             )
                     except Exception as db_exc:
                         act_save_ok = False
@@ -279,13 +285,14 @@ def render():
                     else:
                         material_save_ok = True
                         try:
-                            create_material(
+                            new_material_id = create_material(
                                 act_id=cur_act["act_id"],
                                 material_name=material_name.strip(),
                                 certificate_number=certificate_number.strip() or None,
                                 valid_from=certificate_valid_from,
                                 valid_to=certificate_valid_to,
                             )
+                            track_created("materials", {"id": new_material_id})
                         except Exception as db_exc:
                             material_save_ok = False
                             print(f"[DB ERROR] Не удалось сохранить материал «{material_name.strip()}»: {db_exc}")

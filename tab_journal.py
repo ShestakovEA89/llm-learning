@@ -5,7 +5,7 @@ import streamlit as st
 
 from journal import create_work_journal_entry
 from cache import get_work_journal_entries, get_work_journal_entries_for_period
-from shared import go_to_object_tab
+from shared import go_to_object_tab, track_created
 
 
 def render():
@@ -46,13 +46,14 @@ def render():
                 else:
                     journal_save_ok = True
                     try:
-                        create_work_journal_entry(
+                        new_journal_id = create_work_journal_entry(
                             object_id=journal_object_id,
                             work_date=work_date,
                             location=location.strip(),
                             work_type=work_type.strip(),
                             description=description.strip(),
                         )
+                        track_created("work_journal", {"id": new_journal_id})
                     except Exception as db_exc:
                         journal_save_ok = False
                         print(f"[DB ERROR] Не удалось сохранить запись журнала работ: {db_exc}")

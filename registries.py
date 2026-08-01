@@ -47,6 +47,7 @@ def get_registry_documents(registry_id):
 
 
 def create_registry_documents_bulk(registry_id, rows):
+    new_ids = []
     with get_db_connection() as cur:
         for row in rows:
             cur.execute(
@@ -54,7 +55,8 @@ def create_registry_documents_bulk(registry_id, rows):
                 INSERT INTO registry_documents
                     (registry_id, seq_number, is_category_header, document_name,
                      document_number_date, issuing_org, page_count, note)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s);
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id;
                 """,
                 (
                     registry_id,
@@ -67,6 +69,8 @@ def create_registry_documents_bulk(registry_id, rows):
                     row.get("note"),
                 ),
             )
+            new_ids.append(cur.fetchone()[0])
+    return new_ids
 
 
 REGISTRY_PARSE_PROMPT = """Ты помощник инженера, который разбирает списки исполнительной документации

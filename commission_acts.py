@@ -19,10 +19,12 @@ def create_commission_act_signatory(commission_act_id, person_id, role):
         cur.execute(
             """
             INSERT INTO commission_act_signatories (commission_act_id, person_id, role)
-            VALUES (%s, %s, %s);
+            VALUES (%s, %s, %s)
+            RETURNING id;
             """,
             (commission_act_id, person_id, role),
         )
+        return cur.fetchone()[0]
 
 
 def get_commission_acts_for_object(object_id):

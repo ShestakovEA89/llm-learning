@@ -12,7 +12,7 @@ from cache import (
     get_commission_acts_for_object,
     get_commission_act_signatories,
 )
-from shared import NEW_ORG_OPTION, go_to_object_tab
+from shared import NEW_ORG_OPTION, go_to_object_tab, track_created
 
 COMMISSION_ACT_TYPES = [
     "входной контроль",
@@ -113,7 +113,7 @@ def render():
                     else:
                         ca_org_save_ok = True
                         try:
-                            create_organization(
+                            new_ca_org_id = create_organization(
                                 name=ca_new_name.strip(),
                                 roles=ca_new_roles,
                                 inn=ca_new_inn.strip(),
@@ -122,6 +122,11 @@ def render():
                                 phone=ca_new_phone.strip(),
                                 sro_info="",
                             )
+                            track_created("organizations", {"id": new_ca_org_id})
+                            for ca_new_role in ca_new_roles:
+                                track_created(
+                                    "organization_roles", {"organization_id": new_ca_org_id, "role": ca_new_role}
+                                )
                         except Exception as db_exc:
                             ca_org_save_ok = False
                             print(f"[DB ERROR] Не удалось сохранить организацию «{ca_new_name.strip()}»: {db_exc}")
@@ -187,10 +192,12 @@ def render():
                         city=ca_city.strip(),
                         findings_text=ca_findings_text.strip() or None,
                     )
+                    track_created("commission_acts", {"id": new_ca_id})
                     for ca_slug, ca_role_label in COMMISSION_ROLE_SLOTS:
-                        create_commission_act_signatory(
+                        new_ca_signatory_id = create_commission_act_signatory(
                             new_ca_id, ca_role_person_ids[ca_slug], ca_role_label.lower()
                         )
+                        track_created("commission_act_signatories", {"id": new_ca_signatory_id})
                 except Exception as db_exc:
                     ca_save_ok = False
                     print(f"[DB ERROR] Не удалось сохранить комиссионный акт: {db_exc}")

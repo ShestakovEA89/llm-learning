@@ -21,7 +21,7 @@ from cache import (
     get_registries_for_object,
     get_registry_documents,
 )
-from shared import NEW_ORG_OPTION
+from shared import NEW_ORG_OPTION, track_created
 
 NEW_OBJECT_OPTION = "➕ Добавить новый объект"
 
@@ -148,6 +148,7 @@ def render():
                         name=object_name_raw,
                         address=object_address_raw,
                     )
+                    track_created("objects", {"id": object_id})
                     object_name = f"{object_name_raw}, {object_address_raw}"
                     get_objects.clear()
                 else:
@@ -164,6 +165,8 @@ def render():
                         phone=new_obj_developer["phone"].strip(),
                         sro_info=new_obj_developer["sro_info"].strip(),
                     )
+                    track_created("organizations", {"id": developer_id})
+                    track_created("organization_roles", {"organization_id": developer_id, "role": "застройщик"})
                     developer_name = new_obj_developer["name"].strip()
                     get_organizations.clear()
                 else:
@@ -180,6 +183,8 @@ def render():
                         phone=new_obj_contractor["phone"].strip(),
                         sro_info=new_obj_contractor["sro_info"].strip(),
                     )
+                    track_created("organizations", {"id": contractor_id})
+                    track_created("organization_roles", {"organization_id": contractor_id, "role": "подрядчик"})
                     contractor_name = new_obj_contractor["name"].strip()
                     get_organizations.clear()
                 else:
@@ -244,11 +249,12 @@ def render():
                 else:
                     registry_save_ok = True
                     try:
-                        create_registry(
+                        new_registry_id = create_registry(
                             cur_obj["object_id"],
                             new_registry_section_name.strip(),
                             new_registry_project_marks.strip() or None,
                         )
+                        track_created("registries", {"id": new_registry_id})
                     except Exception as db_exc:
                         registry_save_ok = False
                         print(f"[DB ERROR] Не удалось сохранить реестр «{new_registry_section_name.strip()}»: {db_exc}")
@@ -340,7 +346,11 @@ def render():
                     if st.button("Сохранить все строки", key="registry_save_parsed_btn"):
                         registry_bulk_save_ok = True
                         try:
-                            create_registry_documents_bulk(registry_choice[0], parsed_preview_rows)
+                            new_registry_doc_ids = create_registry_documents_bulk(
+                                registry_choice[0], parsed_preview_rows
+                            )
+                            for new_registry_doc_id in new_registry_doc_ids:
+                                track_created("registry_documents", {"id": new_registry_doc_id})
                         except Exception as db_exc:
                             registry_bulk_save_ok = False
                             print(f"[DB ERROR] Не удалось сохранить строки реестра: {db_exc}")
@@ -417,7 +427,7 @@ def render():
             else:
                 rep_save_ok = True
                 try:
-                    create_responsible_person(
+                    new_rep_id = create_responsible_person(
                         organization_id=rep_organization_id,
                         full_name=rep_full_name.strip(),
                         position=rep_position.strip(),
@@ -425,6 +435,7 @@ def render():
                         order_date=rep_order_date,
                         registry_number=rep_registry_number.strip(),
                     )
+                    track_created("responsible_persons", {"id": new_rep_id})
                 except Exception as db_exc:
                     rep_save_ok = False
                     print(f"[DB ERROR] Не удалось сохранить представителя «{rep_full_name.strip()}»: {db_exc}")
