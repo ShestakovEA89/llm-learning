@@ -34,6 +34,19 @@ st.markdown(
     .stButton > button {
         background-color: #0F9D6E !important;
         border-color: #0F9D6E !important;
+        transition: background-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease !important;
+    }
+
+    .stButton > button:hover {
+        background-color: #0C7F5A !important;
+        border-color: #0C7F5A !important;
+        box-shadow: 0 2px 6px rgba(15, 157, 110, 0.35) !important;
+    }
+
+    .stButton > button:active {
+        background-color: #0A6B4C !important;
+        border-color: #0A6B4C !important;
+        transform: scale(0.98) !important;
     }
 
     .stTextInput *, .stTextArea * {
