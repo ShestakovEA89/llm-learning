@@ -1,5 +1,5 @@
 from db import get_db_connection
-from requests import create_pending_request, mark_request_completed
+from pending_requests import create_pending_request, mark_request_completed
 from cache import get_pending_requests
 
 

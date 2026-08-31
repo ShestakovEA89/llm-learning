@@ -12,7 +12,7 @@ from registries import (
     parse_registry_text,
     create_registry_documents_bulk,
 )
-from requests import create_pending_request, mark_request_completed
+from pending_requests import create_pending_request, mark_request_completed
 from cache import (
     get_objects,
     get_object_org_links,
