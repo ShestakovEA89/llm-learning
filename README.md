@@ -9,6 +9,7 @@ RAG-приложение (Retrieval-Augmented Generation) для инженер�
 - Чат с историей сообщений в рамках сессии
 - Ответы со ссылками на источники: имя файла, релевантность и цитата фрагмента
 - Список всех документов, уже загруженных в базу
+- Трекер запросов по объекту — что ещё нужно запросить у кого (форма акта у заказчика, приказы на ответственных лиц, паспорта на материалы у поставщиков, вызов представителя на объект) со статусами «ожидает»/«получено»
 
 ## Стек технологий
 
@@ -76,7 +77,7 @@ streamlit run rag_app.py
 
 - `rag_app.py` — точка входа: роутер `st.tabs()`, который собирает пять вкладок (UI каждой вынесен в отдельный `tab_*.py` ниже) и общую настройку страницы (CSS, заголовок)
 - `shared.py` — общее для нескольких вкладок: метки вкладок и навигационный хелпер `go_to_object_tab()` для переключения на вкладку «Объект»
-- `tab_object.py` — вкладка «🏗️ Объект»: выбор/создание рабочего объекта и организаций, реестры исполнительной документации, представители организаций
+- `tab_object.py` — вкладка «🏗️ Объект»: выбор/создание рабочего объекта и организаций, реестры исполнительной документации, представители организаций, открытые запросы к третьим сторонам
 - `tab_journal.py` — вкладка «📓 Журнал работ»: общий журнал производства работ
 - `tab_new_act.py` — вкладка «📝 Новый акт скрытых работ»: создание акта, подписанты, материалы, генерация .docx
 - `tab_commission_acts.py` — вкладка «📋 Комиссионные акты»: создание комиссионных актов и состава комиссии
@@ -89,11 +90,13 @@ streamlit run rag_app.py
 - `journal.py` — журнал производства работ (`get_work_journal_entries`, `get_work_journal_entries_for_period`, `create_work_journal_entry`)
 - `commission_acts.py` — комиссионные акты и их подписанты (`create_commission_act`, `get_commission_acts_for_object`, `create_commission_act_signatory`, `get_commission_act_signatories`)
 - `registries.py` — реестры исполнительной документации (`get_registries_for_object`, `get_registry_documents`)
+- `requests.py` — трекер запросов по объекту (`get_pending_requests`, `create_pending_request`, `mark_request_completed`)
 - `documents.py` — список загруженных в базу документов для RAG-чата (`get_document_list`)
 - `cache.py` — кэширующие обёртки (`@st.cache_data`) над читающими функциями из модулей выше; сами модули содержат только чистые функции работы с БД, без зависимости от Streamlit
 - `generate_act_final.py` — генерация .docx актов по шаблону
 - `conftest.py` — pytest-fixtures для тестов (изолированные тестовые данные в реальной Supabase + автоочистка)
 - `test_acts.py` — тесты для `create_act`
+- `test_requests.py` — тесты для `create_pending_request`/`mark_request_completed`
 - `test_generate_act.py` — smoke-тест для `generate_act`
 - `templates/` — шаблоны документов (.docx)
 - `requirements.txt` — зависимости проекта
