@@ -14,10 +14,10 @@ def test_object():
     """Создаёт изолированный объект + 2 организации (застройщик/подрядчик) в реальной
     Supabase для одного теста и удаляет всё, что на них ссылается, после теста.
 
-    Внешние ключи acts/materials/act_signatories/objects/responsible_persons/organization_roles
-    -> organizations объявлены без ON DELETE CASCADE, поэтому порядок удаления в teardown важен:
-    materials -> act_signatories -> acts -> responsible_persons -> objects -> organization_roles
-    -> organizations.
+    Внешние ключи acts/materials/act_signatories/objects/responsible_persons/organization_roles/
+    pending_requests -> organizations объявлены без ON DELETE CASCADE, поэтому порядок удаления
+    в teardown важен: materials -> act_signatories -> acts -> responsible_persons ->
+    pending_requests -> objects -> organization_roles -> organizations.
     """
     object_id = create_object(name="PYTEST_object", address="PYTEST_address")
     developer_org_id = create_organization(
@@ -49,6 +49,7 @@ def test_object():
             "DELETE FROM responsible_persons WHERE organization_id IN (%s, %s);",
             (developer_org_id, contractor_org_id),
         )
+        cur.execute("DELETE FROM pending_requests WHERE object_id = %s;", (object_id,))
         cur.execute("DELETE FROM objects WHERE id = %s;", (object_id,))
         cur.execute(
             "DELETE FROM organization_roles WHERE organization_id IN (%s, %s);",

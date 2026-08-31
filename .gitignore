@@ -15,3 +15,4 @@ migrate_add_commission_acts.py
 migrate_add_registries.py
 migrate_fix_signatories_pkey.py
 migrate_organization_roles.py
+migrate_add_pending_requests.py

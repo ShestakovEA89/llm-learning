@@ -26,6 +26,7 @@ from registries import (
     get_registry_documents as get_registry_documents_uncached,
 )
 from documents import get_document_list as get_document_list_uncached
+from requests import get_pending_requests as get_pending_requests_uncached
 
 
 @st.cache_data(ttl=60)
@@ -96,3 +97,8 @@ def get_registry_documents(registry_id):
 @st.cache_data(ttl=60)
 def get_document_list():
     return get_document_list_uncached()
+
+
+@st.cache_data(ttl=60)
+def get_pending_requests(object_id):
+    return get_pending_requests_uncached(object_id)

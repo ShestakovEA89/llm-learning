@@ -12,6 +12,7 @@ from registries import (
     parse_registry_text,
     create_registry_documents_bulk,
 )
+from requests import create_pending_request, mark_request_completed
 from cache import (
     get_objects,
     get_object_org_links,
@@ -20,6 +21,7 @@ from cache import (
     get_responsible_persons,
     get_registries_for_object,
     get_registry_documents,
+    get_pending_requests,
 )
 from shared import NEW_ORG_OPTION, track_created
 
@@ -477,3 +479,72 @@ def render():
                     st.write(f"Приказ №{rep_person_order_number} от {rep_order_date_str}")
                     if rep_person_registry_number:
                         st.write(f"№ в реестре специалистов: {rep_person_registry_number}")
+
+        st.divider()
+        st.subheader("📋 Открытые запросы")
+
+        with st.expander("➕ Добавить запрос"):
+            new_request_title = st.text_input("Что нужно запросить", key="new_request_title")
+            new_request_from = st.text_input("У кого запросить", key="new_request_from")
+            new_request_note = st.text_area("Примечание (необязательно)", key="new_request_note")
+            if st.button("Добавить запрос", key="create_request_btn"):
+                if not new_request_title.strip() or not new_request_from.strip():
+                    st.error("Укажите, что нужно запросить и у кого.")
+                else:
+                    request_save_ok = True
+                    try:
+                        new_request_id = create_pending_request(
+                            cur_obj["object_id"],
+                            new_request_title.strip(),
+                            new_request_from.strip(),
+                            new_request_note.strip() or None,
+                        )
+                        track_created("pending_requests", {"id": new_request_id})
+                    except Exception as db_exc:
+                        request_save_ok = False
+                        print(f"[DB ERROR] Не удалось сохранить запрос «{new_request_title.strip()}»: {db_exc}")
+                        traceback.print_exc()
+                        st.error(
+                            "Не удалось сохранить запрос. "
+                            "Проверьте соединение с базой данных и попробуйте ещё раз."
+                        )
+
+                    if request_save_ok:
+                        get_pending_requests.clear()
+                        st.session_state.pop("new_request_title", None)
+                        st.session_state.pop("new_request_from", None)
+                        st.session_state.pop("new_request_note", None)
+                        st.success(f"Запрос «{new_request_title.strip()}» добавлен.")
+                        st.rerun()
+
+        obj_pending_requests = get_pending_requests(cur_obj["object_id"])
+        if not obj_pending_requests:
+            st.info("Открытых запросов для этого объекта пока нет.")
+        else:
+            for pending_request in obj_pending_requests:
+                (pr_id, pr_title, pr_requested_from, pr_status, pr_created_at,
+                 pr_completed_at, pr_note) = pending_request
+                with st.container(border=True):
+                    pr_status_icon = "⏳" if pr_status == "ожидает" else "✅"
+                    st.markdown(f"{pr_status_icon} **{pr_title}** · у кого: {pr_requested_from}")
+                    pr_created_at_str = pr_created_at.strftime("%d.%m.%Y") if pr_created_at else "—"
+                    st.caption(f"Создан: {pr_created_at_str} · статус: {pr_status}")
+                    if pr_note:
+                        st.write(pr_note)
+                    if pr_status == "ожидает":
+                        if st.button("Отметить выполненным", key=f"complete_request_{pr_id}"):
+                            complete_save_ok = True
+                            try:
+                                mark_request_completed(pr_id)
+                            except Exception as db_exc:
+                                complete_save_ok = False
+                                print(f"[DB ERROR] Не удалось отметить запрос id={pr_id} выполненным: {db_exc}")
+                                traceback.print_exc()
+                                st.error(
+                                    "Не удалось отметить запрос выполненным. "
+                                    "Проверьте соединение с базой данных и попробуйте ещё раз."
+                                )
+
+                            if complete_save_ok:
+                                get_pending_requests.clear()
+                                st.rerun()

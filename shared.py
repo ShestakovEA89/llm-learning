@@ -14,6 +14,7 @@ TRACKABLE_TABLES = {
     "registries", "registry_documents",
     "commission_acts", "commission_act_signatories",
     "work_journal",
+    "pending_requests",
 }
 
 
