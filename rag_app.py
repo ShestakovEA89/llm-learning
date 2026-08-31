@@ -9,6 +9,12 @@ import tab_chat
 
 load_dotenv()
 
+st.set_page_config(
+    page_title="Помощник инженера ПТО",
+    page_icon="🏗️",
+    layout="wide",
+)
+
 st.markdown(
     """
     <style>
