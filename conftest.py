@@ -8,6 +8,26 @@ from organizations import create_organization
 from persons import create_responsible_person
 from acts import create_act, create_act_signatory
 
+import os
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _use_test_database():
+    """Гарантирует, что тесты пишут в отдельный Supabase-проект, а не в
+    боевой. Автоприменяется ко всей тестовой сессии до создания любых
+    фикстур с данными (test_object и т.д.)."""
+    prod = os.environ.get("SUPABASE_CONNECTION")
+    test = os.environ.get("SUPABASE_CONNECTION_TEST")
+    assert test, (
+        "SUPABASE_CONNECTION_TEST не задан — тесты не должны писать "
+        "в боевую БД по умолчанию"
+    )
+    assert test != prod, (
+        "SUPABASE_CONNECTION_TEST совпадает с SUPABASE_CONNECTION — "
+        "тестовая и боевая БД должны различаться"
+    )
+    os.environ["SUPABASE_CONNECTION"] = test
+
 
 @pytest.fixture
 def test_object():

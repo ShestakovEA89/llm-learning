@@ -1,12 +1,8 @@
-import os
 from datetime import date
 import psycopg2
 from docxtpl import DocxTemplate
-from dotenv import load_dotenv
 
-load_dotenv()
-
-SUPABASE_CONNECTION = os.environ["SUPABASE_CONNECTION"]
+from db import get_connection_string
 
 RUSSIAN_MONTHS = {
     1: "января", 2: "февраля", 3: "марта", 4: "апреля",
@@ -64,7 +60,7 @@ def get_person(cur, act_id, role_exact):
 
 
 def generate_act(act_id, output_path, template_path="templates/template.docx"):
-    conn = psycopg2.connect(SUPABASE_CONNECTION)
+    conn = psycopg2.connect(get_connection_string())
     cur = conn.cursor()
 
     cur.execute("""

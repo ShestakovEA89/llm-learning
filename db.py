@@ -5,12 +5,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-SUPABASE_CONNECTION = os.environ["SUPABASE_CONNECTION"]
+
+def get_connection_string():
+    return os.environ["SUPABASE_CONNECTION"]
 
 
 @contextmanager
 def get_db_connection():
-    conn = psycopg2.connect(SUPABASE_CONNECTION)
+    conn = psycopg2.connect(get_connection_string())
     try:
         cur = conn.cursor()
         try:

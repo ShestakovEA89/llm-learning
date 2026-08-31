@@ -7,7 +7,7 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.readers.file import PDFReader
 from llama_index.vector_stores.supabase import SupabaseVectorStore
 
-from db import SUPABASE_CONNECTION
+from db import get_connection_string
 from cache import get_document_list
 
 UPLOAD_DIR = "uploaded_docs"
@@ -16,7 +16,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 def get_vector_store():
     return SupabaseVectorStore(
-        postgres_connection_string=SUPABASE_CONNECTION,
+        postgres_connection_string=get_connection_string(),
         collection_name="pto_documents",
         dimension=384,
     )
