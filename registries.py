@@ -145,6 +145,19 @@ def _extract_json_array(text):
     raise ValueError(f"Не удалось извлечь валидный JSON-массив из ответа Claude: {text[:500]!r}")
 
 
+def _normalize_page_count(rows):
+    for row in rows:
+        raw = row.get("page_count")
+        if raw is None or isinstance(raw, int):
+            continue
+        try:
+            row["page_count"] = int(str(raw).strip())
+        except (ValueError, TypeError):
+            print(f"[parse_registry_text] page_count не число, обнулено: {raw!r}")
+            row["page_count"] = None
+    return rows
+
+
 def parse_registry_text(raw_text):
     client = anthropic.Anthropic()
     with client.messages.stream(
@@ -156,5 +169,12 @@ def parse_registry_text(raw_text):
     ) as stream:
         response = stream.get_final_message()
 
+    if response.stop_reason == "max_tokens":
+        raise ValueError(
+            "Ответ Claude обрезан по лимиту max_tokens — увеличь лимит "
+            "или разбей текст реестра на части"
+        )
+
     response_text = next(block.text for block in response.content if block.type == "text")
-    return _extract_json_array(response_text)
+    parsed = _extract_json_array(response_text)
+    return _normalize_page_count(parsed)
