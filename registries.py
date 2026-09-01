@@ -1,6 +1,7 @@
 import json
 import re
 import anthropic
+from psycopg2.extras import execute_values
 from db import get_db_connection
 
 
@@ -47,30 +48,33 @@ def get_registry_documents(registry_id):
 
 
 def create_registry_documents_bulk(registry_id, rows):
-    new_ids = []
+    values = [
+        (
+            registry_id,
+            row.get("seq_number"),
+            bool(row.get("is_category_header", False)),
+            row.get("document_name"),
+            row.get("document_number_date"),
+            row.get("issuing_org"),
+            row.get("page_count"),
+            row.get("note"),
+        )
+        for row in rows
+    ]
     with get_db_connection() as cur:
-        for row in rows:
-            cur.execute(
-                """
-                INSERT INTO registry_documents
-                    (registry_id, seq_number, is_category_header, document_name,
-                     document_number_date, issuing_org, page_count, note)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                RETURNING id;
-                """,
-                (
-                    registry_id,
-                    row.get("seq_number"),
-                    bool(row.get("is_category_header", False)),
-                    row.get("document_name"),
-                    row.get("document_number_date"),
-                    row.get("issuing_org"),
-                    row.get("page_count"),
-                    row.get("note"),
-                ),
-            )
-            new_ids.append(cur.fetchone()[0])
-    return new_ids
+        result = execute_values(
+            cur,
+            """
+            INSERT INTO registry_documents
+                (registry_id, seq_number, is_category_header, document_name,
+                 document_number_date, issuing_org, page_count, note)
+            VALUES %s
+            RETURNING id;
+            """,
+            values,
+            fetch=True,
+        )
+    return [row[0] for row in result]
 
 
 REGISTRY_PARSE_PROMPT = """Ты помощник инженера, который разбирает списки исполнительной документации
