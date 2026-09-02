@@ -9,6 +9,9 @@ import tab_chat
 
 load_dotenv()
 
+from db import warm_up_pool
+warm_up_pool()
+
 st.set_page_config(
     page_title="Помощник инженера ПТО",
     page_icon="🏗️",

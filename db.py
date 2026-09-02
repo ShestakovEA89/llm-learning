@@ -25,6 +25,14 @@ def _get_pool():
     return _pool
 
 
+def warm_up_pool():
+    """Явно прогревает пул соединений. Вызывается один раз при старте
+    Streamlit-приложения (rag_app.py) — НЕ автоматически при импорте
+    модуля, чтобы conftest.py успевал переключить SUPABASE_CONNECTION
+    на тестовую БД до первого реального подключения."""
+    _get_pool()
+
+
 @contextmanager
 def get_db_connection():
     pool = _get_pool()
@@ -40,9 +48,3 @@ def get_db_connection():
     except Exception:
         pool.putconn(conn, close=True)
         raise
-
-
-# Прогреваем пул сразу при импорте модуля, а не при первом реальном
-# обращении — чтобы задержка (~15с на 5 соединений) приходилась на
-# старт процесса Streamlit, а не на первый клик пользователя.
-_get_pool()
