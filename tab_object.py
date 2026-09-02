@@ -171,7 +171,8 @@ def render():
                     track_created("organizations", {"id": developer_id})
                     track_created("organization_roles", {"organization_id": developer_id, "role": "застройщик"})
                     developer_name = new_obj_developer["name"].strip()
-                    get_organizations.clear()
+                    get_organizations_by_roles.clear()
+                    get_all_organizations.clear()
                 else:
                     developer_id = obj_developer_choice[0]
                     developer_name = obj_developer_choice[1]
@@ -189,7 +190,8 @@ def render():
                     track_created("organizations", {"id": contractor_id})
                     track_created("organization_roles", {"organization_id": contractor_id, "role": "подрядчик"})
                     contractor_name = new_obj_contractor["name"].strip()
-                    get_organizations.clear()
+                    get_organizations_by_roles.clear()
+                    get_all_organizations.clear()
                 else:
                     contractor_id = obj_contractor_choice[0]
                     contractor_name = obj_contractor_choice[1]
