@@ -16,6 +16,25 @@ def get_organizations(role):
         return cur.fetchall()
 
 
+def get_organizations_by_roles(roles):
+    with get_db_connection() as cur:
+        cur.execute(
+            """
+            SELECT o.id, o.name, r.role
+            FROM organizations o
+            JOIN organization_roles r ON r.organization_id = o.id
+            WHERE r.role = ANY(%s)
+            ORDER BY o.name;
+            """,
+            (list(roles),),
+        )
+        rows = cur.fetchall()
+    result = {role: [] for role in roles}
+    for org_id, org_name, org_role in rows:
+        result[org_role].append((org_id, org_name))
+    return result
+
+
 def create_organization(name, roles, inn, ogrn, address, phone, sro_info):
     with get_db_connection() as cur:
         cur.execute(

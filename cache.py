@@ -7,6 +7,7 @@ from objects import (
 from organizations import (
     get_organizations as get_organizations_uncached,
     get_all_organizations as get_all_organizations_uncached,
+    get_organizations_by_roles as get_organizations_by_roles_uncached,
 )
 from persons import get_responsible_persons as get_responsible_persons_uncached
 from acts import (
@@ -42,6 +43,11 @@ def get_object_org_links(object_id):
 @st.cache_data(ttl=300)
 def get_organizations(role):
     return get_organizations_uncached(role)
+
+
+@st.cache_data(ttl=300)
+def get_organizations_by_roles(roles):
+    return get_organizations_by_roles_uncached(roles)
 
 
 @st.cache_data(ttl=300)

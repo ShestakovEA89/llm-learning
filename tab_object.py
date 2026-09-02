@@ -16,7 +16,7 @@ from pending_requests import create_pending_request, mark_request_completed
 from cache import (
     get_objects,
     get_object_org_links,
-    get_organizations,
+    get_organizations_by_roles,
     get_all_organizations,
     get_responsible_persons,
     get_registries_for_object,
@@ -38,8 +38,9 @@ def render():
     st.caption("Выберите объект, застройщика и подрядчика — они будут использоваться в журнале работ и актах.")
 
     obj_objects = get_objects()
-    obj_developers = get_organizations("застройщик")
-    obj_contractors = get_organizations("подрядчик")
+    orgs_by_role = get_organizations_by_roles(("застройщик", "подрядчик"))
+    obj_developers = orgs_by_role["застройщик"]
+    obj_contractors = orgs_by_role["подрядчик"]
 
     obj_object_options = [(None, OBJECT_PLACEHOLDER)] + list(obj_objects) + [(None, NEW_OBJECT_OPTION)]
     obj_developer_options = [(None, DEVELOPER_PLACEHOLDER)] + list(obj_developers) + [(None, NEW_ORG_OPTION)]
