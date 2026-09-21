@@ -1,6 +1,8 @@
 from docx import Document
 
 from generate_act_final import generate_act
+from persons import create_responsible_person
+from acts import create_act_signatory
 
 
 def _all_docx_text(path):
@@ -25,3 +27,26 @@ def test_generate_act_creates_docx_with_act_data(full_act, tmp_path):
     assert "PYTEST-ACT-FULL" in text
     assert "Тестовые работы для генерации акта" in text
     assert "Тестовый Производитель Работ" in text
+
+
+def test_generate_act_signatory_without_order(full_act, test_object, tmp_path):
+    """Иной представитель (п.1.4 плана): приказа нет, order_number/order_date = NULL.
+    generate_act не должен падать."""
+    person_id = create_responsible_person(
+        organization_id=test_object["developer_org_id"],
+        full_name="Тестовый Иной Представитель",
+        position="Заместитель главы",
+        order_number=None,
+        order_date=None,
+        registry_number="",
+    )
+    create_act_signatory(full_act, person_id, "иные лица, строительный контроль")
+
+    output_path = tmp_path / "act_no_order.docx"
+    generate_act(act_id=full_act, output_path=str(output_path))
+
+    assert output_path.exists()
+
+    text = _all_docx_text(str(output_path))
+    assert "Заместитель главы Тестовый Иной Представитель" in text
+    assert "приказ №None" not in text

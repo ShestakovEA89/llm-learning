@@ -41,6 +41,21 @@ def get_org_details(cur, act_id, roles):
     return "", ""
 
 
+def format_person_line(position, full_name, registry_number, order_number, order_date):
+    """Строка подписанта для акта. Чистая функция, без БД.
+    Приказа может не быть (иные представители, п.1.4 плана) —
+    тогда только должность и ФИО."""
+    line = " ".join(p for p in (position, full_name) if p)
+    if order_number:
+        order_part = f"приказ №{order_number}"
+        if order_date:
+            order_part += f" от {order_date.strftime('%d.%m.%Y')}"
+        line += f", {order_part}"
+    if registry_number:
+        line += f", № в реестре специалистов {registry_number}"
+    return line
+
+
 def get_person(cur, act_id, role_exact):
     cur.execute("""
         SELECT rp.full_name, rp.position, rp.registry_number, rp.order_number, rp.order_date
@@ -53,9 +68,7 @@ def get_person(cur, act_id, role_exact):
     if not row:
         return "", ""
     full_name, position, registry_number, order_number, order_date = row
-    full_line = f"{position} {full_name}, приказ №{order_number} от {order_date.strftime('%d.%m.%Y')}"
-    if registry_number:
-        full_line += f", № в реестре специалистов {registry_number}"
+    full_line = format_person_line(position, full_name, registry_number, order_number, order_date)
     return full_line, full_name
 
 
