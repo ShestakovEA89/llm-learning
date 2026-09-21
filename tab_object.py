@@ -6,7 +6,7 @@ import streamlit as st
 
 from objects import create_object, update_object_org_links
 from organizations import create_organization
-from persons import create_responsible_person
+from persons import create_responsible_person, validate_order_fields
 from registries import (
     create_registry,
     parse_registry_text,
@@ -408,9 +408,9 @@ def render():
         rep_position = st.text_input("Должность", key="rep_position")
         rep_col1, rep_col2 = st.columns(2)
         with rep_col1:
-            rep_order_number = st.text_input("Номер приказа", key="rep_order_number")
+            rep_order_number = st.text_input("Номер приказа (необязательно для иных представителей)", key="rep_order_number")
         with rep_col2:
-            rep_order_date = st.date_input("Дата приказа", value=datetime.date.today(), key="rep_order_date")
+            rep_order_date = st.date_input("Дата приказа", value=None, key="rep_order_date")
         rep_registry_number = st.text_input(
             "№ в реестре специалистов (необязательно)", key="rep_registry_number"
         )
@@ -423,8 +423,7 @@ def render():
                 rep_errors.append("Укажите ФИО.")
             if not rep_position.strip():
                 rep_errors.append("Укажите должность.")
-            if not rep_order_number.strip():
-                rep_errors.append("Укажите номер приказа.")
+            rep_errors.extend(validate_order_fields(rep_order_number, rep_order_date))
 
             if rep_errors:
                 for err in rep_errors:
@@ -436,7 +435,7 @@ def render():
                         organization_id=rep_organization_id,
                         full_name=rep_full_name.strip(),
                         position=rep_position.strip(),
-                        order_number=rep_order_number.strip(),
+                        order_number=rep_order_number.strip() or None,
                         order_date=rep_order_date,
                         registry_number=rep_registry_number.strip(),
                     )
@@ -452,7 +451,7 @@ def render():
 
                 if rep_save_ok:
                     get_responsible_persons.clear()
-                    for k in ("rep_full_name", "rep_position", "rep_order_number", "rep_registry_number"):
+                    for k in ("rep_full_name", "rep_position", "rep_order_number", "rep_order_date", "rep_registry_number"):
                         st.session_state.pop(k, None)
                     st.success(f"Представитель «{rep_full_name.strip()}» добавлен.")
                     st.rerun()
@@ -476,10 +475,13 @@ def render():
                 with st.container(border=True):
                     st.markdown(f"**{rep_person_full_name}** · {rep_person_position}")
                     st.caption(rep_role_by_org.get(rep_person_org_id, "Организация"))
-                    rep_order_date_str = (
-                        rep_person_order_date.strftime("%d.%m.%Y") if rep_person_order_date else "—"
-                    )
-                    st.write(f"Приказ №{rep_person_order_number} от {rep_order_date_str}")
+                    if rep_person_order_number:
+                        rep_order_date_str = (
+                            rep_person_order_date.strftime("%d.%m.%Y") if rep_person_order_date else "—"
+                        )
+                        st.write(f"Приказ №{rep_person_order_number} от {rep_order_date_str}")
+                    else:
+                        st.write("Без приказа")
                     if rep_person_registry_number:
                         st.write(f"№ в реестре специалистов: {rep_person_registry_number}")
 

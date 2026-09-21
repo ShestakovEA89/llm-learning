@@ -29,3 +29,15 @@ def create_responsible_person(organization_id, full_name, position, order_number
         )
         new_id = cur.fetchone()[0]
         return new_id
+
+
+def validate_order_fields(order_number, order_date):
+    """Приказ либо указан полностью (номер + дата), либо отсутствует целиком.
+    Возвращает список текстов ошибок (пустой — всё в порядке)."""
+    has_number = bool(order_number and order_number.strip())
+    has_date = order_date is not None
+    if has_number and not has_date:
+        return ["Укажите дату приказа или очистите номер приказа."]
+    if has_date and not has_number:
+        return ["Укажите номер приказа или очистите дату приказа."]
+    return []
