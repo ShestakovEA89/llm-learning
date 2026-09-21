@@ -8,6 +8,7 @@ from generate_act_final import generate_act as generate_act_docx
 from acts import create_act, create_act_signatory, create_material
 from cache import (
     get_organizations,
+    get_all_organizations,
     get_responsible_persons,
     get_acts_for_object,
     get_materials_for_act,
@@ -131,6 +132,33 @@ def render():
                     key="act_subcontractor_control_person",
                 )
 
+        st.markdown("**Иные представители лиц, участвующих в освидетельствовании (необязательно)**")
+        act_other_all_orgs = get_all_organizations()
+        act_other_org_options = [(None, "— Не указывать —")] + [
+            (o[0], f"{o[1]} ({o[2]})") for o in act_other_all_orgs
+        ]
+        act_other_org_choice = st.selectbox(
+            "Организация иного представителя",
+            options=act_other_org_options,
+            format_func=lambda o: o[1],
+            key="act_other_org",
+        )
+        act_other_person_choice = (None, None)
+        if act_other_org_choice[0] is not None:
+            act_other_persons = get_responsible_persons([act_other_org_choice[0]])
+            if not act_other_persons:
+                st.info("Сначала добавьте представителя на вкладке «Объект».")
+            else:
+                act_other_person_options = [(None, "— Выберите представителя —")] + [
+                    (p[0], p[1]) for p in act_other_persons
+                ]
+                act_other_person_choice = st.selectbox(
+                    "Представитель",
+                    options=act_other_person_options,
+                    format_func=lambda o: o[1],
+                    key="act_other_person",
+                )
+
         st.markdown("**Представитель проектировщика — авторский надзор (необязательно)**")
         act_designer_orgs = get_organizations("проектировщик")
         act_designer_org_options = [(None, "— Не указывать —")] + list(act_designer_orgs)
@@ -222,6 +250,10 @@ def render():
                     if act_designer_control_person_choice[0] is not None:
                         _add_act_signatory(
                             act_designer_control_person_choice[0], "проектировщик, строительный контроль"
+                        )
+                    if act_other_person_choice[0] is not None:
+                        _add_act_signatory(
+                            act_other_person_choice[0], "иные лица, строительный контроль"
                         )
                 except Exception as db_exc:
                     act_save_ok = False
