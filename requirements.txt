@@ -10,3 +10,4 @@ pypdf
 docxtpl
 psycopg2-binary
 torchvision
+sqlalchemy<2.1
