@@ -9,3 +9,4 @@ llama-index-vector-stores-supabase
 pypdf
 docxtpl
 psycopg2-binary
+torchvision
