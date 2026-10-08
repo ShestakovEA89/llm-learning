@@ -36,7 +36,8 @@
   чтение PDF, построение индекса, запросы к векторному хранилищу
 - **Claude API (Anthropic)** — LLM для генерации ответов в чате и для
   AI-разбора текста реестра (`parse_registry_text`)
-- **HuggingFace Embeddings** (`BAAI/bge-small-en-v1.5`) — построение
+- **HuggingFace Embeddings** (`intfloat/multilingual-e5-small`,
+  мультиязычная) — построение
   эмбеддингов документов для RAG
 - **Supabase (Postgres + pgvector)** — персистентное хранилище векторов
   и метаданных документов для RAG-чата

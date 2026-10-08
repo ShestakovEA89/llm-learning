@@ -9,6 +9,17 @@ from llama_index.vector_stores.supabase import SupabaseVectorStore
 
 from db import get_connection_string
 from cache import get_document_list
+from documents import RAG_COLLECTION_NAME
+
+# Мультиязычная модель: нормативные документы (СП, ГОСТы) на русском.
+# Размерность вектора 384, лимит модели — 512 токенов на фрагмент.
+EMBED_MODEL_NAME = "intfloat/multilingual-e5-small"
+EMBED_DIMENSION = 384
+# Размер фрагмента в токенах LlamaIndex. Русский текст при 512 таких
+# токенах укладывается в лимит модели с запасом; при дефолтных 1024
+# хвост фрагмента обрезался бы и не попадал в вектор.
+CHUNK_SIZE = 512
+CHUNK_OVERLAP = 64
 
 UPLOAD_DIR = "uploaded_docs"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -17,15 +28,22 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 def get_vector_store():
     return SupabaseVectorStore(
         postgres_connection_string=get_connection_string(),
-        collection_name="pto_documents",
-        dimension=384,
+        collection_name=RAG_COLLECTION_NAME,
+        dimension=EMBED_DIMENSION,
     )
 
 
 @st.cache_resource
 def configure_llm_settings():
     Settings.llm = Anthropic(model="claude-sonnet-5")
-    Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
+    # Модели семейства E5 обучены с префиксами: без них качество поиска падает.
+    Settings.embed_model = HuggingFaceEmbedding(
+        model_name=EMBED_MODEL_NAME,
+        query_instruction="query: ",
+        text_instruction="passage: ",
+    )
+    Settings.chunk_size = CHUNK_SIZE
+    Settings.chunk_overlap = CHUNK_OVERLAP
 
 
 configure_llm_settings()
@@ -38,6 +56,8 @@ def render():
     doc_list = get_document_list()
     if doc_list:
         st.caption(f"📚 Документы в базе: {', '.join(doc_list)}")
+    else:
+        st.info("В базе пока нет документов — загрузите PDF ниже, чтобы задавать по ним вопросы.")
 
     # Подключаемся к существующему индексу в Supabase при старте приложения
     if "index" not in st.session_state:
