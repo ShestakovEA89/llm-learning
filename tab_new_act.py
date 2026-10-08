@@ -1,6 +1,6 @@
 import datetime
 import io
-import traceback
+import logging
 
 import streamlit as st
 
@@ -15,6 +15,8 @@ from cache import (
     get_work_journal_entries_for_period,
 )
 from shared import go_to_object_tab, track_created
+
+logger = logging.getLogger(__name__)
 
 
 def render():
@@ -255,10 +257,9 @@ def render():
                         _add_act_signatory(
                             act_other_person_choice[0], "иные лица, строительный контроль"
                         )
-                except Exception as db_exc:
+                except Exception:
                     act_save_ok = False
-                    print(f"[DB ERROR] Не удалось сохранить акт №{act_number.strip()}: {db_exc}")
-                    traceback.print_exc()
+                    logger.exception(f"Не удалось сохранить акт №{act_number.strip()}")
                     st.error(
                         "Не удалось сохранить акт. "
                         "Проверьте соединение с базой данных и попробуйте ещё раз."
@@ -332,10 +333,9 @@ def render():
                                 valid_to=certificate_valid_to,
                             )
                             track_created("materials", {"id": new_material_id})
-                        except Exception as db_exc:
+                        except Exception:
                             material_save_ok = False
-                            print(f"[DB ERROR] Не удалось сохранить материал «{material_name.strip()}»: {db_exc}")
-                            traceback.print_exc()
+                            logger.exception(f"Не удалось сохранить материал «{material_name.strip()}»")
                             st.error(
                                 "Не удалось сохранить материал. "
                                 "Проверьте соединение с базой данных и попробуйте ещё раз."

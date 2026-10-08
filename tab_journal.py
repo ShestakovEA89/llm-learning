@@ -1,11 +1,13 @@
 import datetime
-import traceback
+import logging
 
 import streamlit as st
 
 from journal import create_work_journal_entry
 from cache import get_work_journal_entries, get_work_journal_entries_for_period
 from shared import go_to_object_tab, track_created
+
+logger = logging.getLogger(__name__)
 
 
 def render():
@@ -54,10 +56,9 @@ def render():
                             description=description.strip(),
                         )
                         track_created("work_journal", {"id": new_journal_id})
-                    except Exception as db_exc:
+                    except Exception:
                         journal_save_ok = False
-                        print(f"[DB ERROR] Не удалось сохранить запись журнала работ: {db_exc}")
-                        traceback.print_exc()
+                        logger.exception("Не удалось сохранить запись журнала работ")
                         st.error(
                             "Не удалось сохранить запись в журнале работ. "
                             "Проверьте соединение с базой данных и попробуйте ещё раз."

@@ -1,8 +1,11 @@
 import json
+import logging
 import re
 import anthropic
 from psycopg2.extras import execute_values
 from db import get_db_connection
+
+logger = logging.getLogger(__name__)
 
 
 def get_registries_for_object(object_id):
@@ -157,7 +160,7 @@ def _normalize_page_count(rows):
         try:
             row["page_count"] = int(str(raw).strip())
         except (ValueError, TypeError):
-            print(f"[parse_registry_text] page_count не число, обнулено: {raw!r}")
+            logger.warning("page_count не число, обнулено: %r", raw)
             row["page_count"] = None
     return rows
 
