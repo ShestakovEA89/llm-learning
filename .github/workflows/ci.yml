@@ -41,7 +41,7 @@ jobs:
       # Только то, что нужно тестам: полный requirements.txt тянет
       # torch/transformers (несколько ГБ), а тестам они не нужны.
       - name: Install test dependencies
-        run: pip install pytest ruff psycopg2-binary python-dotenv docxtpl anthropic
+        run: pip install pytest ruff psycopg2-binary python-dotenv docxtpl anthropic streamlit==1.65.0
 
       # Только реальные ошибки (синтаксис, неопределённые имена), без стиля.
       - name: Lint
