@@ -1,5 +1,5 @@
-from db import get_db_connection
-from session_cleanup import TABLE_DELETE_ORDER
+from app.db import get_db_connection
+from app.session_cleanup import TABLE_DELETE_ORDER
 
 # Таблицы схемы, которые сознательно не участвуют в TABLE_DELETE_ORDER /
 # TRACKABLE_TABLES и не должны учитываться при сверке с FK.

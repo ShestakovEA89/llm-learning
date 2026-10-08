@@ -1,4 +1,4 @@
-from db import get_db_connection
+from app.db import get_db_connection
 
 # Коллекция векторов RAG-чата в схеме vecs. Имя привязано к модели
 # эмбеддингов: векторы разных моделей несовместимы, поэтому при смене

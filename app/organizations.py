@@ -1,4 +1,4 @@
-from db import get_db_connection
+from app.db import get_db_connection
 
 
 def get_organizations(role):

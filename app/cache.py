@@ -1,33 +1,33 @@
 import streamlit as st
 
-from objects import (
+from app.objects import (
     get_objects as get_objects_uncached,
     get_object_org_links as get_object_org_links_uncached,
 )
-from organizations import (
+from app.organizations import (
     get_organizations as get_organizations_uncached,
     get_all_organizations as get_all_organizations_uncached,
     get_organizations_by_roles as get_organizations_by_roles_uncached,
 )
-from persons import get_responsible_persons as get_responsible_persons_uncached
-from acts import (
+from app.persons import get_responsible_persons as get_responsible_persons_uncached
+from app.acts import (
     get_acts_for_object as get_acts_for_object_uncached,
     get_materials_for_act as get_materials_for_act_uncached,
 )
-from journal import (
+from app.journal import (
     get_work_journal_entries as get_work_journal_entries_uncached,
     get_work_journal_entries_for_period as get_work_journal_entries_for_period_uncached,
 )
-from commission_acts import (
+from app.commission_acts import (
     get_commission_acts_for_object as get_commission_acts_for_object_uncached,
     get_commission_act_signatories as get_commission_act_signatories_uncached,
 )
-from registries import (
+from app.registries import (
     get_registries_for_object as get_registries_for_object_uncached,
     get_registry_documents as get_registry_documents_uncached,
 )
-from documents import get_document_list as get_document_list_uncached
-from pending_requests import get_pending_requests as get_pending_requests_uncached
+from app.documents import get_document_list as get_document_list_uncached
+from app.pending_requests import get_pending_requests as get_pending_requests_uncached
 
 
 @st.cache_data(ttl=300)

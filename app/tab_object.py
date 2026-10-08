@@ -1,19 +1,19 @@
 import datetime
-import traceback
+import logging
 
 import anthropic
 import streamlit as st
 
-from objects import create_object, update_object_org_links
-from organizations import create_organization
-from persons import create_responsible_person, validate_order_fields
-from registries import (
+from app.objects import create_object, update_object_org_links
+from app.organizations import create_organization
+from app.persons import create_responsible_person, validate_order_fields
+from app.registries import (
     create_registry,
     parse_registry_text,
     create_registry_documents_bulk,
 )
-from pending_requests import create_pending_request, mark_request_completed
-from cache import (
+from app.pending_requests import create_pending_request, mark_request_completed
+from app.cache import (
     get_objects,
     get_object_org_links,
     get_organizations_by_roles,
@@ -23,7 +23,15 @@ from cache import (
     get_registry_documents,
     get_pending_requests,
 )
-from shared import NEW_ORG_OPTION, track_created
+from app.shared import (
+    NEW_ORG_OPTION,
+    new_org_required_filled,
+    new_org_widget_keys,
+    render_new_org_fields,
+    track_created,
+)
+
+logger = logging.getLogger(__name__)
 
 NEW_OBJECT_OPTION = "➕ Добавить новый объект"
 
@@ -31,6 +39,26 @@ OBJECT_PLACEHOLDER = "— Выберите объект —"
 DEVELOPER_PLACEHOLDER = "— Выберите застройщика —"
 CONTRACTOR_PLACEHOLDER = "— Выберите подрядчика —"
 OTHER_ORG_OPTION = "— Другая организация из базы —"
+
+
+def _create_org_with_role(org, role):
+    """Создаёт организацию из полей формы с одной ролью, регистрирует её в
+    трекере тестовой сессии и сбрасывает кэши. Возвращает (id, название)."""
+    name = org["name"].strip()
+    org_id = create_organization(
+        name=name,
+        roles=[role],
+        inn=org["inn"].strip(),
+        ogrn=org["ogrn"].strip(),
+        address=org["address"].strip(),
+        phone=org["phone"].strip(),
+        sro_info=org["sro_info"].strip(),
+    )
+    track_created("organizations", {"id": org_id})
+    track_created("organization_roles", {"organization_id": org_id, "role": role})
+    get_organizations_by_roles.clear()
+    get_all_organizations.clear()
+    return org_id, name
 
 
 def render():
@@ -84,16 +112,9 @@ def render():
     )
     new_obj_developer = {}
     if obj_developer_choice[1] == NEW_ORG_OPTION:
-        st.caption("Новая организация — застройщик")
-        new_obj_developer["name"] = st.text_input("Название организации", key="obj_tab_new_developer_name")
-        odcol1, odcol2 = st.columns(2)
-        with odcol1:
-            new_obj_developer["inn"] = st.text_input("ИНН", key="obj_tab_new_developer_inn")
-        with odcol2:
-            new_obj_developer["ogrn"] = st.text_input("ОГРН", key="obj_tab_new_developer_ogrn")
-        new_obj_developer["address"] = st.text_input("Адрес", key="obj_tab_new_developer_address")
-        new_obj_developer["phone"] = st.text_input("Телефон", key="obj_tab_new_developer_phone")
-        new_obj_developer["sro_info"] = st.text_input("Данные СРО (необязательно)", key="obj_tab_new_developer_sro")
+        new_obj_developer = render_new_org_fields(
+            "obj_tab_new_developer", "Новая организация — застройщик"
+        )
 
     obj_contractor_choice = st.selectbox(
         "Подрядчик",
@@ -103,16 +124,9 @@ def render():
     )
     new_obj_contractor = {}
     if obj_contractor_choice[1] == NEW_ORG_OPTION:
-        st.caption("Новая организация — подрядчик")
-        new_obj_contractor["name"] = st.text_input("Название организации", key="obj_tab_new_contractor_name")
-        occol1, occol2 = st.columns(2)
-        with occol1:
-            new_obj_contractor["inn"] = st.text_input("ИНН", key="obj_tab_new_contractor_inn")
-        with occol2:
-            new_obj_contractor["ogrn"] = st.text_input("ОГРН", key="obj_tab_new_contractor_ogrn")
-        new_obj_contractor["address"] = st.text_input("Адрес", key="obj_tab_new_contractor_address")
-        new_obj_contractor["phone"] = st.text_input("Телефон", key="obj_tab_new_contractor_phone")
-        new_obj_contractor["sro_info"] = st.text_input("Данные СРО (необязательно)", key="obj_tab_new_contractor_sro")
+        new_obj_contractor = render_new_org_fields(
+            "obj_tab_new_contractor", "Новая организация — подрядчик"
+        )
 
     if st.button("Сохранить", key="obj_tab_save"):
         obj_errors = []
@@ -125,17 +139,13 @@ def render():
         if obj_developer_choice[1] == DEVELOPER_PLACEHOLDER:
             obj_errors.append("Выберите застройщика или создайте новую организацию.")
         elif obj_developer_choice[1] == NEW_ORG_OPTION:
-            if not new_obj_developer["name"].strip() or not new_obj_developer["inn"].strip() \
-                    or not new_obj_developer["ogrn"].strip() or not new_obj_developer["address"].strip() \
-                    or not new_obj_developer["phone"].strip():
+            if not new_org_required_filled(new_obj_developer):
                 obj_errors.append("Заполните все обязательные поля новой организации-застройщика.")
 
         if obj_contractor_choice[1] == CONTRACTOR_PLACEHOLDER:
             obj_errors.append("Выберите подрядчика или создайте новую организацию.")
         elif obj_contractor_choice[1] == NEW_ORG_OPTION:
-            if not new_obj_contractor["name"].strip() or not new_obj_contractor["inn"].strip() \
-                    or not new_obj_contractor["ogrn"].strip() or not new_obj_contractor["address"].strip() \
-                    or not new_obj_contractor["phone"].strip():
+            if not new_org_required_filled(new_obj_contractor):
                 obj_errors.append("Заполните все обязательные поля новой организации-подрядчика.")
 
         if obj_errors:
@@ -159,49 +169,22 @@ def render():
                     object_name = f"{obj_object_choice[1]}, {obj_object_choice[2]}"
 
                 if obj_developer_choice[0] is None:
-                    developer_id = create_organization(
-                        name=new_obj_developer["name"].strip(),
-                        roles=["застройщик"],
-                        inn=new_obj_developer["inn"].strip(),
-                        ogrn=new_obj_developer["ogrn"].strip(),
-                        address=new_obj_developer["address"].strip(),
-                        phone=new_obj_developer["phone"].strip(),
-                        sro_info=new_obj_developer["sro_info"].strip(),
-                    )
-                    track_created("organizations", {"id": developer_id})
-                    track_created("organization_roles", {"organization_id": developer_id, "role": "застройщик"})
-                    developer_name = new_obj_developer["name"].strip()
-                    get_organizations_by_roles.clear()
-                    get_all_organizations.clear()
+                    developer_id, developer_name = _create_org_with_role(new_obj_developer, "застройщик")
                 else:
                     developer_id = obj_developer_choice[0]
                     developer_name = obj_developer_choice[1]
 
                 if obj_contractor_choice[0] is None:
-                    contractor_id = create_organization(
-                        name=new_obj_contractor["name"].strip(),
-                        roles=["подрядчик"],
-                        inn=new_obj_contractor["inn"].strip(),
-                        ogrn=new_obj_contractor["ogrn"].strip(),
-                        address=new_obj_contractor["address"].strip(),
-                        phone=new_obj_contractor["phone"].strip(),
-                        sro_info=new_obj_contractor["sro_info"].strip(),
-                    )
-                    track_created("organizations", {"id": contractor_id})
-                    track_created("organization_roles", {"organization_id": contractor_id, "role": "подрядчик"})
-                    contractor_name = new_obj_contractor["name"].strip()
-                    get_organizations_by_roles.clear()
-                    get_all_organizations.clear()
+                    contractor_id, contractor_name = _create_org_with_role(new_obj_contractor, "подрядчик")
                 else:
                     contractor_id = obj_contractor_choice[0]
                     contractor_name = obj_contractor_choice[1]
 
                 update_object_org_links(object_id, developer_id, contractor_id)
                 get_object_org_links.clear()
-            except Exception as db_exc:
+            except Exception:
                 db_save_ok = False
-                print(f"[DB ERROR] Не удалось сохранить рабочий объект/организации: {db_exc}")
-                traceback.print_exc()
+                logger.exception("Не удалось сохранить рабочий объект/организации")
                 st.error(
                     "Не удалось сохранить рабочий объект. "
                     "Проверьте соединение с базой данных и попробуйте ещё раз."
@@ -219,10 +202,8 @@ def render():
 
                 for k in (
                     "obj_tab_new_object_name", "obj_tab_new_object_address",
-                    "obj_tab_new_developer_name", "obj_tab_new_developer_inn", "obj_tab_new_developer_ogrn",
-                    "obj_tab_new_developer_address", "obj_tab_new_developer_phone", "obj_tab_new_developer_sro",
-                    "obj_tab_new_contractor_name", "obj_tab_new_contractor_inn", "obj_tab_new_contractor_ogrn",
-                    "obj_tab_new_contractor_address", "obj_tab_new_contractor_phone", "obj_tab_new_contractor_sro",
+                    *new_org_widget_keys("obj_tab_new_developer"),
+                    *new_org_widget_keys("obj_tab_new_contractor"),
                 ):
                     st.session_state.pop(k, None)
 
@@ -260,10 +241,9 @@ def render():
                             new_registry_project_marks.strip() or None,
                         )
                         track_created("registries", {"id": new_registry_id})
-                    except Exception as db_exc:
+                    except Exception:
                         registry_save_ok = False
-                        print(f"[DB ERROR] Не удалось сохранить реестр «{new_registry_section_name.strip()}»: {db_exc}")
-                        traceback.print_exc()
+                        logger.exception(f"Не удалось сохранить реестр «{new_registry_section_name.strip()}»")
                         st.error(
                             "Не удалось сохранить реестр. "
                             "Проверьте соединение с базой данных и попробуйте ещё раз."
@@ -356,10 +336,9 @@ def render():
                             )
                             for new_registry_doc_id in new_registry_doc_ids:
                                 track_created("registry_documents", {"id": new_registry_doc_id})
-                        except Exception as db_exc:
+                        except Exception:
                             registry_bulk_save_ok = False
-                            print(f"[DB ERROR] Не удалось сохранить строки реестра: {db_exc}")
-                            traceback.print_exc()
+                            logger.exception("Не удалось сохранить строки реестра")
                             st.error(
                                 "Не удалось сохранить строки реестра. "
                                 "Разобранные данные не потеряны — проверьте соединение с базой данных "
@@ -440,10 +419,9 @@ def render():
                         registry_number=rep_registry_number.strip(),
                     )
                     track_created("responsible_persons", {"id": new_rep_id})
-                except Exception as db_exc:
+                except Exception:
                     rep_save_ok = False
-                    print(f"[DB ERROR] Не удалось сохранить представителя «{rep_full_name.strip()}»: {db_exc}")
-                    traceback.print_exc()
+                    logger.exception(f"Не удалось сохранить представителя «{rep_full_name.strip()}»")
                     st.error(
                         "Не удалось сохранить представителя. "
                         "Проверьте соединение с базой данных и попробуйте ещё раз."
@@ -505,10 +483,9 @@ def render():
                             new_request_note.strip() or None,
                         )
                         track_created("pending_requests", {"id": new_request_id})
-                    except Exception as db_exc:
+                    except Exception:
                         request_save_ok = False
-                        print(f"[DB ERROR] Не удалось сохранить запрос «{new_request_title.strip()}»: {db_exc}")
-                        traceback.print_exc()
+                        logger.exception(f"Не удалось сохранить запрос «{new_request_title.strip()}»")
                         st.error(
                             "Не удалось сохранить запрос. "
                             "Проверьте соединение с базой данных и попробуйте ещё раз."
@@ -541,10 +518,9 @@ def render():
                             complete_save_ok = True
                             try:
                                 mark_request_completed(pr_id)
-                            except Exception as db_exc:
+                            except Exception:
                                 complete_save_ok = False
-                                print(f"[DB ERROR] Не удалось отметить запрос id={pr_id} выполненным: {db_exc}")
-                                traceback.print_exc()
+                                logger.exception(f"Не удалось отметить запрос id={pr_id} выполненным")
                                 st.error(
                                     "Не удалось отметить запрос выполненным. "
                                     "Проверьте соединение с базой данных и попробуйте ещё раз."

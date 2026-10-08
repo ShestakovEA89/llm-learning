@@ -1,5 +1,7 @@
 # Помощник инженера ПТО
 
+![Вкладка «Новый акт скрытых работ»](docs/screenshot.png)
+
 Приложение для инженеров производственно-технического отдела (ПТО) в
 строительстве — ведёт учёт исполнительной документации на объекте:
 объекты и организации, журнал производства работ, акты скрытых работ,
@@ -96,7 +98,7 @@ streamlit run rag_app.py
 ## Тестирование
 
 Тесты пишут в **отдельный, изолированный** Supabase-проект — не в
-боевую БД. `conftest.py` содержит session-scoped fixture, которая
+боевую БД. `tests/conftest.py` содержит session-scoped fixture, которая
 явно проверяет, что `SUPABASE_CONNECTION_TEST` задан и отличается от
 `SUPABASE_CONNECTION`, и переключает подключение на тестовый проект
 до создания любых тестовых данных. Тестовые данные (объект,
@@ -128,66 +130,78 @@ Supabase (`auth`, `storage`, `realtime` и т.п.), которые уже сущ
 ## Структура проекта
 
 - `rag_app.py` — точка входа: роутер `st.tabs()`, который собирает пять
-  вкладок (UI каждой вынесен в отдельный `tab_*.py` ниже), настройку
+  вкладок (UI каждой вынесен в отдельный `app/tab_*.py` ниже), настройку
   страницы (CSS, заголовок) и явный прогрев пула соединений к БД
   (`warm_up_pool()`) при старте
-- `shared.py` — общее для нескольких вкладок: метки вкладок и
+- `app/shared.py` — общее для нескольких вкладок: метки вкладок и
   навигационный хелпер `go_to_object_tab()` для переключения на вкладку
   «Объект»
-- `tab_object.py` — вкладка «🏗️ Объект»: выбор/создание рабочего объекта
+- `app/tab_object.py` — вкладка «🏗️ Объект»: выбор/создание рабочего объекта
   и организаций, реестры исполнительной документации, представители
   организаций, открытые запросы к третьим сторонам
-- `tab_journal.py` — вкладка «📓 Журнал работ»: общий журнал производства
+- `app/tab_journal.py` — вкладка «📓 Журнал работ»: общий журнал производства
   работ
-- `tab_new_act.py` — вкладка «📝 Новый акт скрытых работ»: создание акта,
+- `app/tab_new_act.py` — вкладка «📝 Новый акт скрытых работ»: создание акта,
   подписанты, материалы, генерация .docx
-- `tab_commission_acts.py` — вкладка «📋 Комиссионные акты»: создание
+- `app/tab_commission_acts.py` — вкладка «📋 Комиссионные акты»: создание
   комиссионных актов и состава комиссии
-- `tab_chat.py` — вкладка «💬 Чат по документам»: RAG-чат, загрузка PDF,
+- `app/tab_chat.py` — вкладка «💬 Чат по документам»: RAG-чат, загрузка PDF,
   настройка LLM (`configure_llm_settings`)
-- `db.py` — подключение к Supabase через пул соединений
+- `app/db.py` — подключение к Supabase через пул соединений
   (`get_db_connection`, `get_connection_string`, `warm_up_pool`)
-- `objects.py` — объекты строительства (`get_objects`,
+- `app/objects.py` — объекты строительства (`get_objects`,
   `get_object_org_links`, `create_object`, `update_object_org_links`)
-- `organizations.py` — организации (`get_organizations`,
+- `app/organizations.py` — организации (`get_organizations`,
   `get_all_organizations`, `create_organization`)
-- `persons.py` — ответственные лица (`get_responsible_persons`,
+- `app/persons.py` — ответственные лица (`get_responsible_persons`,
   `create_responsible_person`)
-- `acts.py` — акты скрытых работ, подписанты, материалы
+- `app/acts.py` — акты скрытых работ, подписанты, материалы
   (`get_acts_for_object`, `create_act`, `create_act_signatory`,
   `get_materials_for_act`, `create_material`)
-- `journal.py` — журнал производства работ (`get_work_journal_entries`,
+- `app/journal.py` — журнал производства работ (`get_work_journal_entries`,
   `get_work_journal_entries_for_period`, `create_work_journal_entry`)
-- `commission_acts.py` — комиссионные акты и их подписанты
+- `app/commission_acts.py` — комиссионные акты и их подписанты
   (`create_commission_act`, `get_commission_acts_for_object`,
   `create_commission_act_signatory`, `get_commission_act_signatories`)
-- `registries.py` — реестры исполнительной документации, включая
+- `app/registries.py` — реестры исполнительной документации, включая
   AI-разбор сырого текста реестра (`get_registries_for_object`,
   `get_registry_documents`, `create_registry_documents_bulk`,
   `parse_registry_text`)
-- `pending_requests.py` — трекер запросов по объекту
+- `app/pending_requests.py` — трекер запросов по объекту
   (`get_pending_requests`, `create_pending_request`,
   `mark_request_completed`)
-- `documents.py` — список загруженных в базу документов для RAG-чата
+- `app/documents.py` — список загруженных в базу документов для RAG-чата
   (`get_document_list`)
-- `cache.py` — кэширующие обёртки (`@st.cache_data`) над читающими
+- `app/cache.py` — кэширующие обёртки (`@st.cache_data`) над читающими
   функциями из модулей выше; сами модули содержат только чистые функции
   работы с БД, без зависимости от Streamlit
-- `session_cleanup.py` — механизм отмены тестовой сессии
+- `app/session_cleanup.py` — механизм отмены тестовой сессии
   (`track_created()` + `delete_tracked_rows()` с батч-удалением по
   таблицам, соблюдая порядок FK)
-- `generate_act_final.py` — генерация .docx актов по шаблону
-- `conftest.py` — pytest-fixtures для тестов (изолированная тестовая
+- `app/generate_act_final.py` — генерация .docx актов по шаблону
+- `tests/conftest.py` — pytest-fixtures для тестов (изолированная тестовая
   Supabase-БД + автоочистка)
-- `test_acts.py` — тесты для `create_act`
-- `test_pending_requests.py` — тесты для `create_pending_request`/
+- `tests/test_acts.py` — тесты для `create_act`
+- `tests/test_pending_requests.py` — тесты для `create_pending_request`/
   `mark_request_completed`
-- `test_generate_act.py` — smoke-тест для `generate_act`
-- `test_session_cleanup.py` — проверяет `TABLE_DELETE_ORDER` против
+- `tests/test_generate_act.py` — smoke-тест для `generate_act`
+- `tests/test_session_cleanup.py` — проверяет `TABLE_DELETE_ORDER` против
   реальных FK-зависимостей через `information_schema`
+- `tests/test_format_person_line.py` — формат строки подписанта в акте
+  (без БД)
+- `tests/test_validate_order_fields.py` — проверка полей приказа
+  представителя (без БД)
 - `templates/` — шаблоны документов (.docx)
 - `requirements.txt` — зависимости проекта
 - `requirements-dev.txt` — `requirements.txt` + `pytest`, для разработки
   и тестов
 - `uploaded_docs/` — локально сохранённые загруженные PDF (не хранится
   в git)
+- `pyproject.toml` — настройки pytest (папка тестов, путь импорта)
+- `.github/workflows/ci.yml` — CI: ruff и полный набор тестов на
+  PostgreSQL, поднятом из `schema.sql`
+
+## Лицензия
+
+Все права защищены. Код опубликован для ознакомления; использование,
+копирование и распространение — только с разрешения автора.

@@ -1,15 +1,21 @@
+import logging
+
 import streamlit as st
 from dotenv import load_dotenv
-from shared import TAB_OBJECT_LABEL, render_session_cleanup_panel
-import tab_journal
-import tab_object
-import tab_new_act
-import tab_commission_acts
-import tab_chat
-
+from app.shared import TAB_OBJECT_LABEL, render_session_cleanup_panel
+from app import tab_journal
+from app import tab_object
+from app import tab_new_act
+from app import tab_commission_acts
+from app import tab_chat
 load_dotenv()
 
-from db import warm_up_pool
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+)
+
+from app.db import warm_up_pool
 warm_up_pool()
 
 st.set_page_config(

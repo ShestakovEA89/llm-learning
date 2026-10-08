@@ -8,6 +8,28 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+
+    # Чистый PostgreSQL на время прогона: тесты пишут в него, а не в Supabase.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pto_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # conftest.py требует, чтобы тестовая строка была задана и отличалась
+      # от боевой. Боевая здесь — заглушка: к ней никто не подключается.
+      SUPABASE_CONNECTION: postgresql://postgres:postgres@localhost:5432/prod_placeholder
+      SUPABASE_CONNECTION_TEST: postgresql://postgres:postgres@localhost:5432/pto_test
+
     steps:
       - uses: actions/checkout@v4
 
@@ -16,20 +38,27 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      # Только то, что нужно тестам без БД: полный requirements.txt тянет
-      # torch/transformers (несколько ГБ) и для этих тестов не нужен.
+      # Только то, что нужно тестам: полный requirements.txt тянет
+      # torch/transformers (несколько ГБ), а тестам они не нужны.
       - name: Install test dependencies
-        run: pip install pytest ruff psycopg2-binary python-dotenv docxtpl
+        run: pip install pytest ruff psycopg2-binary python-dotenv docxtpl anthropic streamlit==1.65.0
 
       # Только реальные ошибки (синтаксис, неопределённые имена), без стиля.
       - name: Lint
         run: ruff check --select E9,F63,F7,F82 .
 
-      # Тесты, которым не нужна база. conftest.py требует, чтобы тестовая
-      # строка подключения была задана и отличалась от боевой, поэтому
-      # здесь стоят заглушки: реального подключения эти тесты не открывают.
-      - name: Unit tests (no database)
+      # Схема из дампа Supabase. Дамп содержит пару команд, которых нет в
+      # чистом PostgreSQL (создание уже существующей схемы public), поэтому
+      # psql запускается без остановки на первой ошибке, а следующим шагом
+      # проверяется, что таблицы действительно создались.
+      - name: Load schema
         env:
-          SUPABASE_CONNECTION: postgresql://ci:ci@localhost:5432/prod_placeholder
-          SUPABASE_CONNECTION_TEST: postgresql://ci:ci@localhost:5432/test_placeholder
-        run: pytest test_format_person_line.py test_validate_order_fields.py -v
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d pto_test -q -f schema.sql
+          count=$(psql -h localhost -U postgres -d pto_test -Atc "select count(*) from information_schema.tables where table_schema = 'public'")
+          echo "tables in public: $count"
+          test "$count" -ge 14
+
+      - name: Tests
+        run: pytest -v

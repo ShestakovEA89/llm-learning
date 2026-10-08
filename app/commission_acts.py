@@ -1,4 +1,4 @@
-from db import get_db_connection
+from app.db import get_db_connection
 
 
 def create_commission_act(object_id, act_type, act_date, city, findings_text):

@@ -1,8 +1,8 @@
 import datetime
 
-from db import get_db_connection
-from acts import create_act
-from cache import get_acts_for_object
+from app.db import get_db_connection
+from app.acts import create_act
+from app.cache import get_acts_for_object
 
 
 def test_create_act_persists_all_fields(test_object):

@@ -2,11 +2,11 @@ import datetime
 
 import pytest
 
-from db import get_db_connection
-from objects import create_object
-from organizations import create_organization
-from persons import create_responsible_person
-from acts import create_act, create_act_signatory
+from app.db import get_db_connection
+from app.objects import create_object
+from app.organizations import create_organization
+from app.persons import create_responsible_person
+from app.acts import create_act, create_act_signatory
 
 import os
 

@@ -1,18 +1,20 @@
 import datetime
-import traceback
+import logging
 
 import streamlit as st
 
-from organizations import create_organization
-from commission_acts import create_commission_act, create_commission_act_signatory
-from cache import (
+from app.organizations import create_organization
+from app.commission_acts import create_commission_act, create_commission_act_signatory
+from app.cache import (
     get_organizations,
     get_all_organizations,
     get_responsible_persons,
     get_commission_acts_for_object,
     get_commission_act_signatories,
 )
-from shared import NEW_ORG_OPTION, go_to_object_tab, track_created
+from app.shared import NEW_ORG_OPTION, go_to_object_tab, track_created
+
+logger = logging.getLogger(__name__)
 
 COMMISSION_ACT_TYPES = [
     "входной контроль",
@@ -127,10 +129,9 @@ def render():
                                 track_created(
                                     "organization_roles", {"organization_id": new_ca_org_id, "role": ca_new_role}
                                 )
-                        except Exception as db_exc:
+                        except Exception:
                             ca_org_save_ok = False
-                            print(f"[DB ERROR] Не удалось сохранить организацию «{ca_new_name.strip()}»: {db_exc}")
-                            traceback.print_exc()
+                            logger.exception(f"Не удалось сохранить организацию «{ca_new_name.strip()}»")
                             st.error(
                                 "Не удалось сохранить организацию. "
                                 "Проверьте соединение с базой данных и попробуйте ещё раз."
@@ -198,10 +199,9 @@ def render():
                             new_ca_id, ca_role_person_ids[ca_slug], ca_role_label.lower()
                         )
                         track_created("commission_act_signatories", {"id": new_ca_signatory_id})
-                except Exception as db_exc:
+                except Exception:
                     ca_save_ok = False
-                    print(f"[DB ERROR] Не удалось сохранить комиссионный акт: {db_exc}")
-                    traceback.print_exc()
+                    logger.exception("Не удалось сохранить комиссионный акт")
                     st.error(
                         "Не удалось сохранить комиссионный акт. "
                         "Проверьте соединение с базой данных и попробуйте ещё раз."

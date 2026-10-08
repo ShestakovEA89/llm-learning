@@ -1,6 +1,6 @@
 import datetime
 
-from persons import validate_order_fields
+from app.persons import validate_order_fields
 
 D = datetime.date(2025, 3, 25)
 

@@ -1,8 +1,8 @@
 from datetime import date
-import psycopg2
+
 from docxtpl import DocxTemplate
 
-from db import get_connection_string
+from app.db import get_db_connection
 
 RUSSIAN_MONTHS = {
     1: "января", 2: "февраля", 3: "марта", 4: "апреля",
@@ -73,63 +73,61 @@ def get_person(cur, act_id, role_exact):
 
 
 def generate_act(act_id, output_path, template_path="templates/template.docx"):
-    conn = psycopg2.connect(get_connection_string())
-    cur = conn.cursor()
+    # Соединение берётся из общего пула и возвращается в него даже при ошибке.
+    with get_db_connection() as cur:
+        cur.execute("""
+            SELECT a.act_number, a.act_date, a.work_name, a.project_docs_ref,
+                   a.date_start, a.date_end, a.normative_docs, a.next_works_allowed,
+                   a.additional_info, a.supporting_docs, a.copies_count,
+                   o.name, o.address
+            FROM acts a
+            JOIN objects o ON a.object_id = o.id
+            WHERE a.id = %s
+        """, (act_id,))
+        act = cur.fetchone()
+        if act is None:
+            raise ValueError(f"Акт с id={act_id} не найден")
+        (act_number, act_date, work_name, project_docs_ref, date_start, date_end,
+         normative_docs, next_works_allowed, additional_info, supporting_docs,
+         copies_count, obj_name, obj_address) = act
 
-    cur.execute("""
-        SELECT a.act_number, a.act_date, a.work_name, a.project_docs_ref,
-               a.date_start, a.date_end, a.normative_docs, a.next_works_allowed,
-               a.additional_info, a.supporting_docs, a.copies_count,
-               o.name, o.address
-        FROM acts a
-        JOIN objects o ON a.object_id = o.id
-        WHERE a.id = %s
-    """, (act_id,))
-    act = cur.fetchone()
-    (act_number, act_date, work_name, project_docs_ref, date_start, date_end,
-     normative_docs, next_works_allowed, additional_info, supporting_docs,
-     copies_count, obj_name, obj_address) = act
+        object_name = f"{obj_name}, {obj_address}"
 
-    object_name = f"{obj_name}, {obj_address}"
+        cur.execute("SELECT material_name, certificate_number FROM materials WHERE act_id = %s", (act_id,))
+        materials = cur.fetchall()
+        materials_list = "; ".join(f"{name} ({cert})" for name, cert in materials)
 
-    cur.execute("SELECT material_name, certificate_number FROM materials WHERE act_id = %s", (act_id,))
-    materials = cur.fetchall()
-    materials_list = "; ".join(f"{name} ({cert})" for name, cert in materials)
+        customer_name, customer_details = get_org_details(cur, act_id, "застройщик, строительный контроль")
+        contractor_name, contractor_details = get_org_details(
+            cur, act_id, ["субподрядчик, строительный контроль", "подрядчик"]
+        )
 
-    customer_name, customer_details = get_org_details(cur, act_id, "застройщик, строительный контроль")
-    contractor_name, contractor_details = get_org_details(
-        cur, act_id, ["субподрядчик, строительный контроль", "подрядчик"]
-    )
+        cur.execute("""
+            SELECT org.name, org.ogrn, org.inn, org.address, org.phone, org.sro_info
+            FROM acts a
+            JOIN organizations org ON a.designer_org_id = org.id
+            WHERE a.id = %s
+        """, (act_id,))
+        designer_row = cur.fetchone()
+        if designer_row:
+            d_name, d_ogrn, d_inn, d_address, d_phone, d_sro_info = designer_row
+            designer_details = f"{d_name}, ОГРН {d_ogrn or 'б/н'}, ИНН {d_inn}, {d_address}, тел. {d_phone}"
+            if d_sro_info:
+                designer_details += f", {d_sro_info}"
+        else:
+            designer_details = ""
 
-    cur.execute("""
-        SELECT org.name, org.ogrn, org.inn, org.address, org.phone, org.sro_info
-        FROM acts a
-        JOIN organizations org ON a.designer_org_id = org.id
-        WHERE a.id = %s
-    """, (act_id,))
-    designer_row = cur.fetchone()
-    if designer_row:
-        d_name, d_ogrn, d_inn, d_address, d_phone, d_sro_info = designer_row
-        designer_details = f"{d_name}, ОГРН {d_ogrn or 'б/н'}, ИНН {d_inn}, {d_address}, тел. {d_phone}"
-        if d_sro_info:
-            designer_details += f", {d_sro_info}"
-    else:
-        designer_details = ""
+        control_rep_customer, control_rep_customer_short = get_person(cur, act_id, "застройщик, строительный контроль")
+        contractor_rep, contractor_rep_short = get_person(cur, act_id, "подрядчик")
+        control_rep_contractor, control_rep_contractor_short = get_person(cur, act_id, "подрядчик, строительный контроль")
+        control_rep_designer, control_rep_designer_short = get_person(cur, act_id, "проектировщик, строительный контроль")
+        control_rep_subcontractor, control_rep_subcontractor_short = get_person(cur, act_id, "субподрядчик, строительный контроль")
 
-    control_rep_customer, control_rep_customer_short = get_person(cur, act_id, "застройщик, строительный контроль")
-    contractor_rep, contractor_rep_short = get_person(cur, act_id, "подрядчик")
-    control_rep_contractor, control_rep_contractor_short = get_person(cur, act_id, "подрядчик, строительный контроль")
-    control_rep_designer, control_rep_designer_short = get_person(cur, act_id, "проектировщик, строительный контроль")
-    control_rep_subcontractor, control_rep_subcontractor_short = get_person(cur, act_id, "субподрядчик, строительный контроль")
+        control_rep_other, control_rep_other_short = get_person(cur, act_id, "иные лица, строительный контроль")
 
-    control_rep_other, control_rep_other_short = get_person(cur, act_id, "иные лица, строительный контроль")
-
-    if not control_rep_subcontractor:
-        control_rep_subcontractor = control_rep_contractor
-        control_rep_subcontractor_short = control_rep_contractor_short
-
-    cur.close()
-    conn.close()
+        if not control_rep_subcontractor:
+            control_rep_subcontractor = control_rep_contractor
+            control_rep_subcontractor_short = control_rep_contractor_short
 
     context = {
         "object_name": object_name,
@@ -169,12 +167,3 @@ def generate_act(act_id, output_path, template_path="templates/template.docx"):
     doc = DocxTemplate(template_path)
     doc.render(context)
     doc.save(output_path)
-    print(f"Акт сохранён: {output_path}")
-
-
-if __name__ == "__main__":
-    generate_act(act_id=1, output_path="final_act_1.docx")
-    generate_act(act_id=2, output_path="final_act_2.docx")
-    generate_act(act_id=10, output_path="final_act_10.docx")
-    generate_act(act_id=11, output_path="final_act_11.docx")
-    generate_act(act_id=12, output_path="final_act_12.docx")

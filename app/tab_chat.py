@@ -7,9 +7,9 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.readers.file import PDFReader
 from llama_index.vector_stores.supabase import SupabaseVectorStore
 
-from db import get_connection_string
-from cache import get_document_list
-from documents import RAG_COLLECTION_NAME
+from app.db import get_connection_string
+from app.cache import get_document_list
+from app.documents import RAG_COLLECTION_NAME
 
 # Мультиязычная модель: нормативные документы (СП, ГОСТы) на русском.
 # Размерность вектора 384, лимит модели — 512 токенов на фрагмент.
