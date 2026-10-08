@@ -1,6 +1,6 @@
 import datetime
 
-from generate_act_final import format_person_line
+from app.generate_act_final import format_person_line
 
 ORDER_DATE = datetime.date(2025, 3, 25)
 

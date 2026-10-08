@@ -1,8 +1,8 @@
 from docx import Document
 
-from generate_act_final import generate_act
-from persons import create_responsible_person
-from acts import create_act_signatory
+from app.generate_act_final import generate_act
+from app.persons import create_responsible_person
+from app.acts import create_act_signatory
 
 
 def _all_docx_text(path):

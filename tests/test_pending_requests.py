@@ -1,6 +1,6 @@
-from db import get_db_connection
-from pending_requests import create_pending_request, mark_request_completed
-from cache import get_pending_requests
+from app.db import get_db_connection
+from app.pending_requests import create_pending_request, mark_request_completed
+from app.cache import get_pending_requests
 
 
 def test_create_pending_request_persists_all_fields(test_object):

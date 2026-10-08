@@ -3,9 +3,9 @@ import logging
 
 import streamlit as st
 
-from journal import create_work_journal_entry
-from cache import get_work_journal_entries, get_work_journal_entries_for_period
-from shared import go_to_object_tab, track_created
+from app.journal import create_work_journal_entry
+from app.cache import get_work_journal_entries, get_work_journal_entries_for_period
+from app.shared import go_to_object_tab, track_created
 
 logger = logging.getLogger(__name__)
 

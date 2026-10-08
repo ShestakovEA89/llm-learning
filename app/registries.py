@@ -3,7 +3,7 @@ import logging
 import re
 import anthropic
 from psycopg2.extras import execute_values
-from db import get_db_connection
+from app.db import get_db_connection
 
 logger = logging.getLogger(__name__)
 

@@ -2,7 +2,7 @@ from datetime import date
 
 from docxtpl import DocxTemplate
 
-from db import get_db_connection
+from app.db import get_db_connection
 
 RUSSIAN_MONTHS = {
     1: "января", 2: "февраля", 3: "марта", 4: "апреля",

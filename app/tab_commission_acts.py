@@ -3,16 +3,16 @@ import logging
 
 import streamlit as st
 
-from organizations import create_organization
-from commission_acts import create_commission_act, create_commission_act_signatory
-from cache import (
+from app.organizations import create_organization
+from app.commission_acts import create_commission_act, create_commission_act_signatory
+from app.cache import (
     get_organizations,
     get_all_organizations,
     get_responsible_persons,
     get_commission_acts_for_object,
     get_commission_act_signatories,
 )
-from shared import NEW_ORG_OPTION, go_to_object_tab, track_created
+from app.shared import NEW_ORG_OPTION, go_to_object_tab, track_created
 
 logger = logging.getLogger(__name__)
 

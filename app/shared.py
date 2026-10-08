@@ -2,7 +2,7 @@ from collections import Counter
 
 import streamlit as st
 
-from session_cleanup import delete_tracked_rows
+from app.session_cleanup import delete_tracked_rows
 
 TAB_OBJECT_LABEL = "🏗️ Объект"
 

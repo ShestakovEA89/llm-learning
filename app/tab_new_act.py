@@ -4,9 +4,9 @@ import logging
 
 import streamlit as st
 
-from generate_act_final import generate_act as generate_act_docx
-from acts import create_act, create_act_signatory, create_material
-from cache import (
+from app.generate_act_final import generate_act as generate_act_docx
+from app.acts import create_act, create_act_signatory, create_material
+from app.cache import (
     get_organizations,
     get_all_organizations,
     get_responsible_persons,
@@ -14,7 +14,7 @@ from cache import (
     get_materials_for_act,
     get_work_journal_entries_for_period,
 )
-from shared import go_to_object_tab, track_created
+from app.shared import go_to_object_tab, track_created
 
 logger = logging.getLogger(__name__)
 

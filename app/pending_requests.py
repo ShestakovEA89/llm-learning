@@ -1,4 +1,4 @@
-from db import get_db_connection
+from app.db import get_db_connection
 
 
 def create_pending_request(object_id, title, requested_from, note=None):

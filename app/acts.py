@@ -1,4 +1,4 @@
-from db import get_db_connection
+from app.db import get_db_connection
 
 
 def create_act(object_id, developer_org_id, contractor_org_id, act_number, date_start, date_end, act_date, work_name, designer_org_id=None, project_docs_ref=None, normative_docs=None, supporting_docs=None):

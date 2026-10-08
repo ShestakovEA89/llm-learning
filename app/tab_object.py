@@ -4,16 +4,16 @@ import logging
 import anthropic
 import streamlit as st
 
-from objects import create_object, update_object_org_links
-from organizations import create_organization
-from persons import create_responsible_person, validate_order_fields
-from registries import (
+from app.objects import create_object, update_object_org_links
+from app.organizations import create_organization
+from app.persons import create_responsible_person, validate_order_fields
+from app.registries import (
     create_registry,
     parse_registry_text,
     create_registry_documents_bulk,
 )
-from pending_requests import create_pending_request, mark_request_completed
-from cache import (
+from app.pending_requests import create_pending_request, mark_request_completed
+from app.cache import (
     get_objects,
     get_object_org_links,
     get_organizations_by_roles,
@@ -23,7 +23,7 @@ from cache import (
     get_registry_documents,
     get_pending_requests,
 )
-from shared import (
+from app.shared import (
     NEW_ORG_OPTION,
     new_org_required_filled,
     new_org_widget_keys,
